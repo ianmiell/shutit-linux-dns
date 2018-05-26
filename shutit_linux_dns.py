@@ -143,21 +143,6 @@ echo "
 		shutit.get_config(self.module_id,'swapsize',default='2G')
 		return True
 
-	def test(self, shutit):
-		return True
-
-	def finalize(self, shutit):
-		return True
-
-	def is_installed(self, shutit):
-		return False
-
-	def start(self, shutit):
-		return True
-
-	def stop(self, shutit):
-		return True
-
 def module():
 	return shutit_linux_dns(
 		'git.shutit_linux_dns.shutit_linux_dns', 3614408475.0001,
