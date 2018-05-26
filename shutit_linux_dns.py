@@ -117,31 +117,68 @@ echo "
 		for machine in sorted(machines.keys()):
 			shutit_session = shutit_sessions[machine]
 			shutit_session.install('nmap strace telnet')
+
+			####################################################################
+			# NSSWITCH
+			####################################################################
 			# Can we ping ok?
 			shutit_session.send('ping -c1 google.com')
 			shutit_session.send('ping -c1 localhost')
-			# Change nsswitch to only have files
-			shutit_session.send("""sed -i 's/hosts: .*/hosts files/g' /etc/nsswitch.conf""")
-			shutit_session.send('ping -c1 google.com')
+			# Change nsswitch to only have files
+			shutit_session.send("""sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf""")
+			shutit_session.send('ping -c1 google.com || true') # google will fail
 			shutit_session.send('ping -c1 localhost')
-			# Change nsswitch to only have dns
-			shutit_session.send("""sed -i 's/hosts: .*/hosts dns/g' /etc/nsswitch.conf""")
+			# Change nsswitch to only have dns
+			shutit_session.send("""sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf""")
 			shutit_session.send('ping -c1 google.com')
-			shutit_session.send('ping -c1 localhost')
+			shutit_session.send('ping -c1 localhost || true') # localhost will fail
+			shutit_session.send("""sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf""")
 			shutit_session.pause_point('ping -c1 google.com')
 
+			####################################################################
 			# resolvconf
+			####################################################################
 			# Show resolv.conf is the resolver
 			# Change resolv.conf by hand
-			# Show resolvconf updates resolv.conf on an ifchange
+			shutit_session.send('ls -l /etc/resolv.conf') # it's a symlink to /run...
+			shutit_session.send("""sed -i 's/^nameserver/#nameserver/' /etc/resolv.conf""")
+			shutit_session.send('ping -c1 google.com || true') # google will fail, no nameserver
+			shutit_session.send("""sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf""")
+			shutit_session.send('ping -c1 google.com') # will work, nameserver back
 
+
+			echo asd > /tmp/asd in /etc/network/if-up.d/000resolvconf
+			THen ifdown enps08 and ifup
+			echo 'nameserver 1.1.1.1' | /sbin/resolvconf -a enp0s8.inet
+			adds this to : run/resolvconf/interface/enp0s8.inet
+			root@linuxdns1:/# cat run/resolvconf/interface/enp0s8.inet 
+			nameserver 1.1.1.1
+
+			#shutit_session.send("""sed -i 's/^nameserver/#nameserver/' /etc/resolv.conf""") # Off again
+			#shutit_session.send('chmod -x /etc/resolvconf/update.d/libc') # resolvconf script no longer in effect
+			#shutit_session.send('resolvconf -u')
+			#shutit_session.send('ping -c1 google.com || true') # google will fail, no nameserver
+			#shutit_session.send('chmod +x /etc/resolvconf/update.d/libc') # resolvconf script back in effect
+			#shutit_session.send('resolvconf -u')
+			#shutit_session.send('ping -c1 google.com') # will work, nameserver back
+
+			####################################################################
 			# Install systemd-resolved
+			####################################################################
+			shutit_session.install('network-manager')
+			shutit_session.pause_point('ok')
 
+			####################################################################
 			# Install NetworkManager?
+			####################################################################
 
+			####################################################################
 			# Install dnsmasq? See what's changed?
+			####################################################################
 
-
+			####################################################################
+			# Install landrush
+			####################################################################
 
 		return True
 
