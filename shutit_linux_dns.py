@@ -129,8 +129,19 @@ echo "
 			shutit_session.send('ping -c1 google.com')
 			shutit_session.send('ping -c1 localhost')
 			shutit_session.pause_point('ping -c1 google.com')
-			# Install dnsmasq? See what's changed?
+
+			# resolvconf
+			# Show resolv.conf is the resolver
+			# Change resolv.conf by hand
+			# Show resolvconf updates resolv.conf on an ifchange
+
 			# Install systemd-resolved
+
+			# Install NetworkManager?
+
+			# Install dnsmasq? See what's changed?
+
+
 
 		return True
 
