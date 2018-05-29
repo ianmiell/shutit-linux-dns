@@ -116,7 +116,8 @@ echo "
 
 		for machine in sorted(machines.keys()):
 			shutit_session = shutit_sessions[machine]
-			shutit_session.install('nmap strace telnet')
+			#shutit_session.send('apt install -y curl strace nmap telnet && curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash',background=True,wait=False,block_other_commands=False)
+			shutit_session.send('apt install -y curl strace nmap telnet && curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash')
 
 			####################################################################
 			# NSSWITCH
@@ -133,7 +134,6 @@ echo "
 			shutit_session.send('ping -c1 google.com')
 			shutit_session.send('ping -c1 localhost || true') # localhost will fail
 			shutit_session.send("""sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf""")
-			shutit_session.pause_point('ping -c1 google.com')
 
 			####################################################################
 			# resolvconf
@@ -145,27 +145,30 @@ echo "
 			shutit_session.send('ping -c1 google.com || true') # google will fail, no nameserver
 			shutit_session.send("""sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf""")
 			shutit_session.send('ping -c1 google.com') # will work, nameserver back
+			shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf') # restore symlink
 
-
-			echo asd > /tmp/asd in /etc/network/if-up.d/000resolvconf
-			THen ifdown enps08 and ifup
-			echo 'nameserver 1.1.1.1' | /sbin/resolvconf -a enp0s8.inet
-			adds this to : run/resolvconf/interface/enp0s8.inet
-			root@linuxdns1:/# cat run/resolvconf/interface/enp0s8.inet 
-			nameserver 1.1.1.1
-
-			#shutit_session.send("""sed -i 's/^nameserver/#nameserver/' /etc/resolv.conf""") # Off again
-			#shutit_session.send('chmod -x /etc/resolvconf/update.d/libc') # resolvconf script no longer in effect
-			#shutit_session.send('resolvconf -u')
-			#shutit_session.send('ping -c1 google.com || true') # google will fail, no nameserver
-			#shutit_session.send('chmod +x /etc/resolvconf/update.d/libc') # resolvconf script back in effect
-			#shutit_session.send('resolvconf -u')
-			#shutit_session.send('ping -c1 google.com') # will work, nameserver back
+			# Where does it get its info from?
+			shutit_session.send("""sed -i '2s/^.*/echo herein000resolvconf > \/tmp\/000resolvconf.out/' /etc/network/if-up.d/000resolvconf""")
+			shutit_session.send('ifdown enp0s8')
+			shutit_session.send('ifup enp0s8')
+			shutit_session.send('cat /tmp/000resolvconf.out')
+			# To make it pick up, run systemctl restart networking
+			shutit_session.send('systemctl restart networking')
+			shutit_session.send('''echo 'nameserver 10.10.10.10' | /sbin/resolvconf -a enp0s8.inet''')
+			shutit_session.send('''cat /run/resolvconf/interface/enp0s8.inet''')
+			shutit_session.send('''cat /etc/resolv.conf''')
+			shutit_session.send('systemctl restart networking')
+			shutit_session.send('''cat /etc/resolv.conf''')
+			shutit_session.pause_point('ok restart networking')
 
 			####################################################################
-			# Install systemd-resolved
+			# Start systemd-resolved
 			####################################################################
-			shutit_session.install('network-manager')
+			shutit_session.send('systemctl enable systemd-resolved')
+			shutit_session.send('systemctl start systemd-resolved')
+			shutit_session.send('cat /etc/resolv.conf')
+			#https://wiki.ubuntu.com/OverrideDNSServers
+
 			shutit_session.pause_point('ok')
 
 			####################################################################
