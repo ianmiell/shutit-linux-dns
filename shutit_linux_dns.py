@@ -117,7 +117,8 @@ echo "
 		for machine in sorted(machines.keys()):
 			shutit_session = shutit_sessions[machine]
 			#shutit_session.send('apt install -y curl strace nmap telnet && curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash',background=True,wait=False,block_other_commands=False)
-			shutit_session.send('apt install -y curl strace nmap telnet && curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash')
+			shutit_session.install('curl strace nmap telnet')
+			shutit_session.send('curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash')
 
 			####################################################################
 			# NSSWITCH
@@ -148,35 +149,108 @@ echo "
 			shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf') # restore symlink
 
 			# Where does it get its info from?
-			shutit_session.send("""sed -i '2s/^.*/echo herein000resolvconf > \/tmp\/000resolvconf.out/' /etc/network/if-up.d/000resolvconf""")
+			# Plug in a log file triggered whenever the 000resolvconf script gets run
+			shutit_session.send("""sed -i '2s/^.*/echo herein000resolvconf > \/tmp\/000resolvconf.log/' /etc/network/if-up.d/000resolvconf""")
+			# Running ifup/ifdown triggers it...
 			shutit_session.send('ifdown enp0s8')
 			shutit_session.send('ifup enp0s8')
-			shutit_session.send('cat /tmp/000resolvconf.out')
-			# To make it pick up, run systemctl restart networking
+			shutit_session.send('cat /tmp/000resolvconf.log')
+			# Remove it
+			shutit_session.send('rm /tmp/000resolvconf.log')
+			# Restart networking
 			shutit_session.send('systemctl restart networking')
+			# The file is back - it also triggered the script
+			shutit_session.send('cat /tmp/000resolvconf.log')
+
+			# Resolvconf adds the nameserver to the interface. Normally interface gets this on creation
 			shutit_session.send('''echo 'nameserver 10.10.10.10' | /sbin/resolvconf -a enp0s8.inet''')
+			# Creates the runtime entry here
 			shutit_session.send('''cat /run/resolvconf/interface/enp0s8.inet''')
-			shutit_session.send('''cat /etc/resolv.conf''')
+			# Updates the resolv.conf
+			shutit_session.send('resolvconf -u')
+			shutit_session.send('cat /etc/resolv.conf')
+			# Restart networking removes this... so presumably picks up the dns servers from the interface as it's brought up
 			shutit_session.send('systemctl restart networking')
 			shutit_session.send('''cat /etc/resolv.conf''')
-			shutit_session.pause_point('ok restart networking')
 
-			####################################################################
-			# Start systemd-resolved
-			####################################################################
-			shutit_session.send('systemctl enable systemd-resolved')
-			shutit_session.send('systemctl start systemd-resolved')
-			shutit_session.send('cat /etc/resolv.conf')
-			#https://wiki.ubuntu.com/OverrideDNSServers
+			#####################################################################
+			## Start systemd-resolved - seems different in vagrant?
+			#####################################################################
+			#shutit_session.send('systemctl enable systemd-resolved')
+			#shutit_session.send('systemctl start systemd-resolved')
+			#shutit_session.send('cat /etc/resolv.conf')
+			##https://wiki.ubuntu.com/OverrideDNSServers
 
-			shutit_session.pause_point('ok')
+			shutit_session.pause_point('network manager?')
 
+			#####################################################################
+			## Install NetworkManager? More about interfaces than anything else
+			#####################################################################
+			#shutit_session.install('network-manager')
+			#shutit_session.send('ls /etc/NetworkManager')
+			#shutit_session.send('cat /etc/NetworkManager/NetworkManager.conf')
+			
 			####################################################################
-			# Install NetworkManager?
+			# dhclient?
 			####################################################################
+			cat /etc/dhcp/dhclient.conf
+			cat /run/.../leases?
+			change the conf to not get dns?
 
 			####################################################################
 			# Install dnsmasq? See what's changed?
+			####################################################################
+			shutit_session.install('dnsmasq')
+			# dnsmasq running
+			shutit_session.send('ps -ef | grep dnsmasq')
+			# Nothing in here.
+			shutit_session.send('ls -lRt /etc/dnsmasq.d')
+			shutit_session.send('systemctl status dnsmasq')
+			# resolv.conf now points to 127.0.0.1!
+			shutit_session.send('cat /etc/resolv.conf')
+			shutit_session.send('cat /var/run/dnsmasq/resolv.conf')
+
+			# https://foxutech.com/how-to-configure-dnsmasq/
+			#Local Caching using NetworkManager
+			#Set this in /etc/NetworkManager/NetworkManager.conf:
+			#[main]
+			#dns=dnsmasq
+			#and restart network-manager service.
+
+			#root@linuxdns1:/etc# ls -lRt | grep 15:28
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc0.d
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc1.d
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc2.d
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc3.d
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc4.d
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc5.d
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc6.d
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 insserv.conf.d
+			#drwxr-xr-x 3 root root    4096 Jun  1 15:28 default
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 init.d
+			#drwxr-xr-x 2 root root    4096 Jun  1 15:28 dnsmasq.d
+			#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
+			#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
+			#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
+			#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
+			#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
+			#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
+			#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
+			#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
+			#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
+			#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
+			#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
+			#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
+			#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
+			#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
+			#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
+			#drwxr-xr-x 2 root root 4096 Jun  1 15:28 system.d
+			#drwxr-xr-x 2 root root 4096 Jun  1 15:28 update.d
+			#drwxr-xr-x 2 root root 4096 Jun  1 15:28 multi-user.target.wants
+			#lrwxrwxrwx 1 root root 35 Jun  1 15:28 dnsmasq.service -> /lib/systemd/system/dnsmasq.service
+
+			####################################################################
+			# Install NCSD?
 			####################################################################
 
 			####################################################################
