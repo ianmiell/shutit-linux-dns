@@ -193,9 +193,9 @@ echo "
 			####################################################################
 			# dhclient?
 			####################################################################
-			cat /etc/dhcp/dhclient.conf
+			shutit.pause_point('dhclient: cat /etc/dhcp/dhclient.conf
 			cat /run/.../leases?
-			change the conf to not get dns?
+			change the conf to not get dns?''')
 
 			####################################################################
 			# Install dnsmasq? See what's changed?
@@ -206,9 +206,10 @@ echo "
 			# Nothing in here.
 			shutit_session.send('ls -lRt /etc/dnsmasq.d')
 			shutit_session.send('systemctl status dnsmasq')
-			# resolv.conf now points to 127.0.0.1!
+			# resolv.conf now points to 127.0.0.1 - dnsmasq has taken over.
 			shutit_session.send('cat /etc/resolv.conf')
 			shutit_session.send('cat /var/run/dnsmasq/resolv.conf')
+			shutit_session.pause_point('cat /var/run/dnsmasq/resolv.conf')
 
 			# https://foxutech.com/how-to-configure-dnsmasq/
 			#Local Caching using NetworkManager
