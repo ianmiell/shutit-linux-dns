@@ -181,7 +181,6 @@ echo "
 			#shutit_session.send('cat /etc/resolv.conf')
 			##https://wiki.ubuntu.com/OverrideDNSServers
 
-			shutit_session.pause_point('network manager?')
 
 			#####################################################################
 			## Install NetworkManager? More about interfaces than anything else
