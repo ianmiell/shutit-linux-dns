@@ -193,8 +193,10 @@ echo "
 			####################################################################
 			# dhclient?
 			####################################################################
-			shutit.pause_point('dhclient: cat /etc/dhcp/dhclient.conf
-			cat /run/.../leases?
+			shutit.send('cat /run/resolvconf/interface/enp0s3.dhclient')
+			shutit.pause_point('''dhclient: cat /etc/dhcp/dhclient.conf
+domain home
+nameserver 10.0.2.2
 			change the conf to not get dns?''')
 
 			####################################################################
