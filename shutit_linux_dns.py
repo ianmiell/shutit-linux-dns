@@ -173,18 +173,18 @@ echo "
 			shutit_session.send('systemctl restart networking')
 			shutit_session.send('''cat /etc/resolv.conf''')
 
-			#####################################################################
+			####################################################################
 			## Start systemd-resolved - seems different in vagrant?
-			#####################################################################
+			####################################################################
 			#shutit_session.send('systemctl enable systemd-resolved')
 			#shutit_session.send('systemctl start systemd-resolved')
 			#shutit_session.send('cat /etc/resolv.conf')
 			##https://wiki.ubuntu.com/OverrideDNSServers
 
 
-			#####################################################################
+			####################################################################
 			## Install NetworkManager? More about interfaces than anything else
-			#####################################################################
+			####################################################################
 			#shutit_session.install('network-manager')
 			#shutit_session.send('ls /etc/NetworkManager')
 			#shutit_session.send('cat /etc/NetworkManager/NetworkManager.conf')
