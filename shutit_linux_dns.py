@@ -7,8 +7,8 @@ import os
 import inspect
 from shutit_module import ShutItModule
 
-class shutit_linux_dns(ShutItModule):
 
+class shutit_linux_dns(ShutItModule):
 
 	def build(self, shutit):
 		vagrant_image = shutit.cfg[self.module_id]['vagrant_image']
@@ -121,9 +121,8 @@ echo "
 			shutit_session.send('curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash')
 
 			#####################################################################
-			# PART I
+			# PART I
 			#####################################################################
-
 
 			####################################################################
 			# NSSWITCH
@@ -191,13 +190,26 @@ echo "
 			shutit_session.send('cat /etc/resolv.conf')
 			# Restart networking removes this... so presumably picks up the dns servers from the interface as it's brought up
 			shutit_session.send('systemctl restart networking')
-			shutit_session.send('''cat /etc/resolv.conf''')
+			shutit_session.send('cat /etc/resolv.conf')
 			####################################################################
 
 			####################################################################
 			# How does interface know 
 			# dhclient? https://jameshfisher.com/2018/02/06/what-is-dhcp
 			####################################################################
+			shutit.send('find /run | grep dh')
+			shutit.send('ps -ef | grep dhclient')
+			shutit.send('cat /var/lib/dhcp/dhclient.enp0s3.leases')
+			shutit.send('cat /var/lib/dhcp/dhclient.enp0s8.leases')
+			# TODO supercede: https://unix.stackexchange.com/questions/136117/ignore-dns-from-dhcp-server-in-ubuntu?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+			shutit.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease')
+			shutit_session.send('cat /etc/resolv.conf', note='resolv.conf as before')
+			shutit_session.send('''sed -i 's/^#supersede.*/supersede domain-name-servers 8.8.8.8, 8.8.4.4;/' /etc/dhcp/dhclient.conf''')
+			shutit.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease after supersede added')
+			shutit_session.send('cat /etc/resolv.conf',note='dns settings overridden')
+			shutit_session.send('''sed -i 's/^supersede.*/#supersede/' /etc/dhcp/dhclient.conf''')
+			shutit.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease after supersede removed')
+			shutit_session.send('cat /etc/resolv.conf',note='dns settings reverted')
 			shutit.pause_point('''dhclient: cat /etc/dhcp/dhclient.conf
 domain home
 nameserver 10.0.2.2
@@ -205,7 +217,7 @@ nameserver 10.0.2.2
 			shutit.send('cat /run/resolvconf/interface/enp0s3.dhclient')
 
 			#####################################################################
-			# PART II
+			# PART II
 			#####################################################################
 
 
@@ -281,7 +293,7 @@ nameserver 10.0.2.2
 			####################################################################
 			# Install NCSD?
 			####################################################################
-			# The answer is that local processes don’t know to connect to /var/run/nscd/socket. Or rather, some do, and some don’t. The processes that do know about /var/run/nscd/socket are those linked against glibc and using getaddrinfo from that library.  Only GNU’s implementation of the C standard library has the knowledge of /var/run/nscd/socket. If your process is linked against a different libc (e.g. musl), or if your process uses a different runtime (e.g. the Go runtime), it knows nothing of /var/run/nscd/socket. This is your first reason for not using nscd.
+			# The answer is that local processes don't know to connect to /var/run/nscd/socket. Or rather, some do, and some don't. The processes that do know about /var/run/nscd/socket are those linked against glibc and using getaddrinfo from that library.  Only GNU's implementation of the C standard library has the knowledge of /var/run/nscd/socket. If your process is linked against a different libc (e.g. musl), or if your process uses a different runtime (e.g. the Go runtime), it knows nothing of /var/run/nscd/socket. This is your first reason for not using nscd.
 
 			####################################################################
 			# Install landrush
