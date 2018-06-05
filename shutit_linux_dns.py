@@ -124,20 +124,6 @@ echo "
 			# PART I
 			#####################################################################
 
-			#####################################################################
-			## getaddrinfo - standard C library?
-			#####################################################################
-			# gai.conf?
-			# https://jameshfisher.com/2018/02/03/what-does-getaddrinfo-do
-			# BUT WAIT THERE’S STILL MORE! After our process has its DNS responses, it does more work. It starts by reading /etc/gai.conf, the “Configuration for getaddrinfo(3).” The function call has its very own configuration file! Luckily, mine is only comments.
-			# Not everything uses gai - eg ping vs host - tho that 
-			# 'Makes sense - a strace of host shows it 'just' goes to /etc/resolv.conf, while ping (for example) looks up nsswitch.' (and gai.conf) etc
-			# Can use gai.conf to hack ipv4 over ipv6 without switching ipv6 off.
-			# https://community.rackspace.com/products/f/public-cloud-forum/5110/how-to-prefer-ipv4-over-ipv6-in-ubuntu-and-centos
-			# eg JAVA has its own dns lookup?
-			shutit_session.send('strace -e trace=openat -f host google.com')
-			# ping references nsswitch
-			shutit_session.send('strace -e trace=openat -f ping -c1 google.com')
 
 			####################################################################
 			# NSSWITCH
@@ -155,24 +141,38 @@ echo "
 			shutit_session.send('ping -c1 localhost || true') # localhost will fail
 			shutit_session.send("""sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf""")
 
+			#####################################################################
+			## getaddrinfo - standard C library?
+			#####################################################################
+			# gai.conf?
+			# https://jameshfisher.com/2018/02/03/what-does-getaddrinfo-do
+			# BUT WAIT THERE’S STILL MORE! After our process has its DNS responses, it does more work. It starts by reading /etc/gai.conf, the “Configuration for getaddrinfo(3).” The function call has its very own configuration file! Luckily, mine is only comments.
+			# Not everything uses gai - eg ping vs host - tho that 
+			# 'Makes sense - a strace of host shows it 'just' goes to /etc/resolv.conf, while ping (for example) looks up nsswitch.' (and gai.conf) etc
+			# Can use gai.conf to hack ipv4 over ipv6 without switching ipv6 off.
+			# https://community.rackspace.com/products/f/public-cloud-forum/5110/how-to-prefer-ipv4-over-ipv6-in-ubuntu-and-centos
+			# eg JAVA has its own dns lookup?
+			shutit_session.send('strace -e trace=openat -f host google.com',note='Host does not use nsswitch, just resolv.conf.')
+			# ping references nsswitch
+			shutit_session.send('strace -e trace=openat -f ping -c1 google.com', note='Ping goes use nsswitch.')
 
 			####################################################################
 			# resolvconf
 			####################################################################
 			# Show resolv.conf is the resolver
 			# Change resolv.conf by hand
-			shutit_session.send('ls -l /etc/resolv.conf') # it's a symlink to /run...
-			shutit_session.send("""sed -i 's/^nameserver/#nameserver/' /etc/resolv.conf""")
-			shutit_session.send('ping -c1 google.com || true') # google will fail, no nameserver
-			shutit_session.send("""sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf""")
-			shutit_session.send('ping -c1 google.com') # will work, nameserver back
-			shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf') # restore symlink
+			shutit_session.send('ls -l /etc/resolv.conf',note='resolvconf turns /etc/resolv.conf into a symlink to the /run folder.')
+			shutit_session.send("sed -i 's/^nameserver/#nameserver/' /etc/resolv.conf", note='Take nameserver out of /etc/resolv.conf')
+			shutit_session.send('ping -c1 google.com || true', note='google will fail, no nameserver specified by /etc/resolv.conf')
+			shutit_session.send("sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf", note='put nameserver back')
+			shutit_session.send('ping -c1 google.com', note='ping works again')
 
-			# Where does it get its info from?
+			# So Where does resolvconf get its info from?
 			# Plug in a log file triggered whenever the 000resolvconf script gets run
-			shutit_session.send("""sed -i '2s/^.*/echo herein000resolvconf > \/tmp\/000resolvconf.log/' /etc/network/if-up.d/000resolvconf""")
+			shutit_session.send("""sed -i '2s@^.*@echo I am triggered by ifup > /tmp/000resolvconf.log@' /etc/network/if-up.d/000resolvconf""")
 			# Running ifup/ifdown triggers it...
 			shutit_session.send('ifdown enp0s8')
+			shutit_session.send('cat /tmp/000resolvconf.log')
 			shutit_session.send('ifup enp0s8')
 			shutit_session.send('cat /tmp/000resolvconf.log')
 			# Remove it
