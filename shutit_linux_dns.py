@@ -120,6 +120,25 @@ echo "
 			shutit_session.install('curl strace nmap telnet')
 			shutit_session.send('curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash')
 
+			#####################################################################
+			# PART I
+			#####################################################################
+
+			#####################################################################
+			## getaddrinfo - standard C library?
+			#####################################################################
+			# gai.conf?
+			# https://jameshfisher.com/2018/02/03/what-does-getaddrinfo-do
+			# BUT WAIT THERE’S STILL MORE! After our process has its DNS responses, it does more work. It starts by reading /etc/gai.conf, the “Configuration for getaddrinfo(3).” The function call has its very own configuration file! Luckily, mine is only comments.
+			# Not everything uses gai - eg ping vs host - tho that 
+			# 'Makes sense - a strace of host shows it 'just' goes to /etc/resolv.conf, while ping (for example) looks up nsswitch.' (and gai.conf) etc
+			# Can use gai.conf to hack ipv4 over ipv6 without switching ipv6 off.
+			# https://community.rackspace.com/products/f/public-cloud-forum/5110/how-to-prefer-ipv4-over-ipv6-in-ubuntu-and-centos
+			# eg JAVA has its own dns lookup?
+			shutit_session.send('strace -e trace=openat -f host google.com')
+			# ping references nsswitch
+			shutit_session.send('strace -e trace=openat -f ping -c1 google.com')
+
 			####################################################################
 			# NSSWITCH
 			####################################################################
@@ -135,6 +154,7 @@ echo "
 			shutit_session.send('ping -c1 google.com')
 			shutit_session.send('ping -c1 localhost || true') # localhost will fail
 			shutit_session.send("""sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf""")
+
 
 			####################################################################
 			# resolvconf
@@ -172,8 +192,24 @@ echo "
 			# Restart networking removes this... so presumably picks up the dns servers from the interface as it's brought up
 			shutit_session.send('systemctl restart networking')
 			shutit_session.send('''cat /etc/resolv.conf''')
+			####################################################################
 
 			####################################################################
+			# How does interface know 
+			# dhclient? https://jameshfisher.com/2018/02/06/what-is-dhcp
+			####################################################################
+			shutit.pause_point('''dhclient: cat /etc/dhcp/dhclient.conf
+domain home
+nameserver 10.0.2.2
+			change the conf to not get dns?''')
+			shutit.send('cat /run/resolvconf/interface/enp0s3.dhclient')
+
+			#####################################################################
+			# PART II
+			#####################################################################
+
+
+			#####################################################################
 			## Start systemd-resolved - seems different in vagrant?
 			####################################################################
 			#shutit_session.send('systemctl enable systemd-resolved')
@@ -181,22 +217,13 @@ echo "
 			#shutit_session.send('cat /etc/resolv.conf')
 			##https://wiki.ubuntu.com/OverrideDNSServers
 
-
-			####################################################################
+			#####################################################################
 			## Install NetworkManager? More about interfaces than anything else
 			####################################################################
 			#shutit_session.install('network-manager')
 			#shutit_session.send('ls /etc/NetworkManager')
 			#shutit_session.send('cat /etc/NetworkManager/NetworkManager.conf')
 			
-			####################################################################
-			# dhclient?
-			####################################################################
-			shutit.pause_point('''dhclient: cat /etc/dhcp/dhclient.conf
-domain home
-nameserver 10.0.2.2
-			change the conf to not get dns?''')
-			shutit.send('cat /run/resolvconf/interface/enp0s3.dhclient')
 
 			####################################################################
 			# Install dnsmasq? See what's changed?
@@ -254,6 +281,7 @@ nameserver 10.0.2.2
 			####################################################################
 			# Install NCSD?
 			####################################################################
+			# The answer is that local processes don’t know to connect to /var/run/nscd/socket. Or rather, some do, and some don’t. The processes that do know about /var/run/nscd/socket are those linked against glibc and using getaddrinfo from that library.  Only GNU’s implementation of the C standard library has the knowledge of /var/run/nscd/socket. If your process is linked against a different libc (e.g. musl), or if your process uses a different runtime (e.g. the Go runtime), it knows nothing of /var/run/nscd/socket. This is your first reason for not using nscd.
 
 			####################################################################
 			# Install landrush
