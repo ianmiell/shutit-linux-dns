@@ -6,7 +6,6 @@ if ! echo '' | xargs --no-run-if-empty >/dev/null 2>&1
 then
 	XARGS_FLAG=''
 fi
-echo $XARGS_FLAG
 if [[ $(command -v VBoxManage) != '' ]]
 then
 	while true
