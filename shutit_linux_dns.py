@@ -56,7 +56,7 @@ end''')
 		# Set up the sessions
 		shutit_sessions = {}
 		for machine in sorted(machines.keys()):
-			shutit_sessions.update({machine:shutit.create_session('bash')})
+			shutit_sessions.update({machine:shutit.create_session('bash', walkthrough=True)})
 		# Set up and validate landrush
 		for machine in sorted(machines.keys()):
 			shutit_session = shutit_sessions[machine]
@@ -67,10 +67,10 @@ end''')
 			try:
 				shutit_session.multisend('vagrant up --provider ' + shutit.cfg['shutit-library.virtualization.virtualization.virtualization']['virt_method'] + machine_name,{'assword for':pw,'assword:':pw})
 			except NameError:
-				shutit.multisend('vagrant up ' + machine,{'assword for':pw,'assword:':pw},timeout=99999)
-			if shutit.send_and_get_output("vagrant status 2> /dev/null | grep -w ^" + machine + " | awk '{print $2}'") != 'running':
-				shutit.pause_point("machine: " + machine + " appears not to have come up cleanly")
-			ip = shutit.send_and_get_output('''vagrant landrush ls 2> /dev/null | grep -w ^''' + machines[machine]['fqdn'] + ''' | awk '{print $2}' ''')
+				shutit_session.multisend('vagrant up ' + machine,{'assword for':pw,'assword:':pw},timeout=99999)
+			if shutit_session.send_and_get_output("vagrant status 2> /dev/null | grep -w ^" + machine + " | awk '{print $2}'") != 'running':
+				shutit_session.pause_point("machine: " + machine + " appears not to have come up cleanly")
+			ip = shutit_session.send_and_get_output('''vagrant landrush ls 2> /dev/null | grep -w ^''' + machines[machine]['fqdn'] + ''' | awk '{print $2}' ''')
 			machines.get(machine).update({'ip':ip})
 			shutit_session.login(command='vagrant ssh ' + machine)
 			shutit_session.login(command='sudo su - ')
@@ -117,8 +117,8 @@ echo "
 		for machine in sorted(machines.keys()):
 			shutit_session = shutit_sessions[machine]
 			#shutit_session.send('apt install -y curl strace nmap telnet && curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash',background=True,wait=False,block_other_commands=False)
-			shutit_session.install('curl strace nmap telnet')
-			shutit_session.send('curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash')
+			shutit_session.install('curl strace nmap telnet',echo=False)
+			shutit_session.send('curl -s https://s3.amazonaws.com/download.draios.com/stable/install-sysdig | bash',echo=False)
 
 			#####################################################################
 			# PART I
@@ -128,16 +128,14 @@ echo "
 			# NSSWITCH
 			####################################################################
 			# Can we ping ok?
-			shutit_session.send('ping -c1 google.com')
-			shutit_session.send('ping -c1 localhost')
-			# Change nsswitch to only have files
-			shutit_session.send("""sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf""")
-			shutit_session.send('ping -c1 google.com || true') # google will fail
-			shutit_session.send('ping -c1 localhost')
-			# Change nsswitch to only have dns
-			shutit_session.send("""sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf""")
-			shutit_session.send('ping -c1 google.com')
-			shutit_session.send('ping -c1 localhost || true') # localhost will fail
+			shutit_session.send('ping -c1 google.com', note='Basic ping to google.comm works')
+			shutit_session.send('ping -c1 localhost', note='Basic ping to localhost works')
+			shutit_session.send("""sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf""", note='Change nsswitch to only have files')
+			shutit_session.send('ping -c1 google.com', note='google lookup will now fail', check_exit=False)
+			shutit_session.send('ping -c1 localhost', note='But localhost still works, presumably because it is handled by "files"')
+			shutit_session.send("sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf", note='Change nsswitch to only have dns')
+			shutit_session.send('ping -c1 google.com', note='Google can now be pinged')
+			shutit_session.send('ping -c1 localhost', note='But localhost will fail', check_exit=False)
 			shutit_session.send("""sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf""")
 
 			#####################################################################
@@ -153,7 +151,7 @@ echo "
 			# eg JAVA has its own dns lookup?
 			shutit_session.send('strace -e trace=openat -f host google.com',note='Host does not use nsswitch, just resolv.conf.')
 			# ping references nsswitch
-			shutit_session.send('strace -e trace=openat -f ping -c1 google.com', note='Ping goes use nsswitch.')
+			shutit_session.send('strace -e trace=openat -f ping -c1 google.com', note='Ping does use nsswitch.')
 
 			####################################################################
 			# resolvconf
@@ -162,7 +160,7 @@ echo "
 			# Change resolv.conf by hand
 			shutit_session.send('ls -l /etc/resolv.conf',note='resolvconf turns /etc/resolv.conf into a symlink to the /run folder.')
 			shutit_session.send("sed -i 's/^nameserver/#nameserver/' /etc/resolv.conf", note='Take nameserver out of /etc/resolv.conf')
-			shutit_session.send('ping -c1 google.com || true', note='google will fail, no nameserver specified by /etc/resolv.conf')
+			shutit_session.send('ping -c1 google.com', note='google will fail, no nameserver specified by /etc/resolv.conf', check_exit=False)
 			shutit_session.send("sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf", note='put nameserver back')
 			shutit_session.send('ping -c1 google.com', note='ping works again')
 
@@ -171,7 +169,7 @@ echo "
 			shutit_session.send("""sed -i '2s@^.*@echo I am triggered by ifup > /tmp/000resolvconf.log@' /etc/network/if-up.d/000resolvconf""")
 			# Running ifup/ifdown triggers it...
 			shutit_session.send('ifdown enp0s8', note='Bring network interface down')
-			shutit_session.send('ls /tmp/000resolvconf.log || true', note='File not created on ifdown')
+			shutit_session.send('ls /tmp/000resolvconf.log', note='File not created on ifdown', check_exit=False)
 			shutit_session.send('ifup enp0s8')
 			shutit_session.send('cat /tmp/000resolvconf.log')
 			# Remove it
@@ -197,24 +195,24 @@ echo "
 			# How does interface know 
 			# dhclient? https://jameshfisher.com/2018/02/06/what-is-dhcp
 			####################################################################
-			shutit.send('find /run | grep dh')
-			shutit.send('ps -ef | grep dhclient')
-			shutit.send('cat /var/lib/dhcp/dhclient.enp0s3.leases')
-			shutit.send('cat /var/lib/dhcp/dhclient.enp0s8.leases')
+			shutit_session.send('find /run | grep dh')
+			shutit_session.send('ps -ef | grep dhclient')
+			shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s3.leases')
+			shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s8.leases')
 			# TODO supercede: https://unix.stackexchange.com/questions/136117/ignore-dns-from-dhcp-server-in-ubuntu?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
-			shutit.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease')
+			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease')
 			shutit_session.send('cat /etc/resolv.conf', note='resolv.conf as before')
 			shutit_session.send('''sed -i 's/^#supersede.*/supersede domain-name-servers 8.8.8.8, 8.8.4.4;/' /etc/dhcp/dhclient.conf''')
-			shutit.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease after supersede added')
+			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease after supersede added')
 			shutit_session.send('cat /etc/resolv.conf',note='dns settings overridden')
 			shutit_session.send('''sed -i 's/^supersede.*/#supersede/' /etc/dhcp/dhclient.conf''')
-			shutit.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease after supersede removed')
+			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease after supersede removed')
 			shutit_session.send('cat /etc/resolv.conf',note='dns settings reverted')
-			shutit.pause_point('''dhclient: cat /etc/dhcp/dhclient.conf
+			shutit_session.pause_point('''dhclient: cat /etc/dhcp/dhclient.conf
 domain home
 nameserver 10.0.2.2
 			change the conf to not get dns?''')
-			shutit.send('cat /run/resolvconf/interface/enp0s3.dhclient')
+			shutit_session.send('cat /run/resolvconf/interface/enp0s3.dhclient')
 
 			#####################################################################
 			# PART II
@@ -318,3 +316,4 @@ def module():
 		delivery_methods=['bash'],
 		depends=['shutit.tk.setup','shutit-library.virtualization.virtualization.virtualization','tk.shutit.vagrant.vagrant.vagrant']
 	)
+
