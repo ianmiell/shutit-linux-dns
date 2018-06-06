@@ -130,13 +130,13 @@ echo "
 			# Can we ping ok?
 			shutit_session.send('ping -c1 google.com',                                                       note='Basic ping to google.com works')
 			shutit_session.send('ping -c1 localhost',                                                        note='Basic ping to localhost works')
-			shutit_session.send("""sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf""",                note='Change nsswitch to only have files')
+			shutit_session.send("sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf",                    note='Change nsswitch to only have files')
 			shutit_session.send('ping -c1 google.com',                                                       note='google lookup will now fail', check_exit=False)
-			shutit_session.send('ping -c1 localhost',                                                        note='But localhost still works, presumably because it is handled by "files"')
+			shutit_session.send('ping -c1 localhost',                                                        note='But localhost still works, presumably because it is handled by /etc/hosts (aka "files"')
 			shutit_session.send("sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf",                      note='Change nsswitch to only have dns')
 			shutit_session.send('ping -c1 google.com',                                                       note='Google can now be pinged')
-			shutit_session.send('ping -c1 localhost',                                                        note='But localhost will fail', check_exit=False)
-			shutit_session.send("""sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf""", note='')
+			shutit_session.send('ping -c1 localhost',                                                        note='But localhost will fail as /etc/hosts not referenced', check_exit=False)
+			shutit_session.send("sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf",     note='Revert nsswitch to where it was')
 
 			#####################################################################
 			## getaddrinfo - standard C library?
@@ -161,6 +161,7 @@ echo "
 			shutit_session.send('ping -c1 google.com',                                  note='google will fail, no nameserver specified by /etc/resolv.conf', check_exit=False)
 			shutit_session.send("sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf", note='put nameserver back')
 			shutit_session.send('ping -c1 google.com',                                  note='ping works again')
+			shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf',note='restore symlink')
 
 			# So Where does resolvconf get its info from?
 			# Plug in a log file triggered whenever the 000resolvconf script gets run
