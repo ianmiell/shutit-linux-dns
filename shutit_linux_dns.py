@@ -141,15 +141,15 @@ echo "
 			#####################################################################
 			## getaddrinfo - standard C library?
 			#####################################################################
-			# gai.conf?
 			# https://jameshfisher.com/2018/02/03/what-does-getaddrinfo-do
 			# BUT WAIT THERE'S STILL MORE! After our process has its DNS responses, it does more work. It starts by reading /etc/gai.conf, the Configuration for getaddrinfo(3). The function call has its very own configuration file! Luckily, mine is only comments.
-			# Not everything uses gai - eg ping vs host - tho that 
-			# 'Makes sense - a strace of host shows it 'just' goes to /etc/resolv.conf, while ping (for example) looks up nsswitch.' (and gai.conf) etc
-			# Can use gai.conf to hack ipv4 over ipv6 without switching ipv6 off.
-			# https://community.rackspace.com/products/f/public-cloud-forum/5110/how-to-prefer-ipv4-over-ipv6-in-ubuntu-and-centos
+			# Not everything uses gai - eg ping vs host.
 			shutit_session.send('strace -e trace=openat -f host google.com',     note='Host does not use nsswitch, just resolv.conf.')
 			shutit_session.send('strace -e trace=openat -f ping -c1 google.com', note='Ping does use nsswitch.')
+
+			# gai.conf?
+			# Can use gai.conf to hack ipv4 over ipv6 without switching ipv6 off.
+			# https://community.rackspace.com/products/f/public-cloud-forum/5110/how-to-prefer-ipv4-over-ipv6-in-ubuntu-and-centos
 
 			####################################################################
 			# resolvconf
@@ -206,10 +206,11 @@ echo "
 			shutit_session.send('cat /etc/resolv.conf',                                 note='dns settings reverted')
 			shutit_session.send('cat /run/resolvconf/interface/enp0s3.dhclient',        note='dhclient settings now in /run')
 
+
+
 			#####################################################################
 			# PART II
 			#####################################################################
-
 
 			#####################################################################
 			## Start systemd-resolved - seems different in vagrant?
