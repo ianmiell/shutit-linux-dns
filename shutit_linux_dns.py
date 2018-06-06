@@ -168,9 +168,9 @@ echo "
 			# Running ifup/ifdown triggers it...
 			shutit_session.send('ifdown enp0s8',                note='Bring network interface down')
 			shutit_session.send('ls /tmp/000resolvconf.log',    note='File not created on ifdown', check_exit=False)
-			shutit_session.send('ifup enp0s8'                   note='Bring up network interface, which triggers probe above')
-			shutit_session.send('cat /tmp/000resolvconf.log'    note='File has now been created')
-			shutit_session.send('rm /tmp/000resolvconf.log'     note='Remove that file')
+			shutit_session.send('ifup enp0s8',                  note='Bring up network interface, which triggers probe above')
+			shutit_session.send('cat /tmp/000resolvconf.log',   note='File has now been created')
+			shutit_session.send('rm /tmp/000resolvconf.log',    note='Remove that file')
 			shutit_session.send('systemctl restart networking', note='Restart networking')
 			shutit_session.send('cat /tmp/000resolvconf.log',   note='The file is back - it also triggered the script')
 
@@ -181,7 +181,7 @@ echo "
 			shutit_session.send('cat /etc/resolv.conf',                      note='Resolv.conf before network restart')
 			shutit_session.send('systemctl restart networking',              note='Restart networking')
 			# Restart networking removes this... so presumably picks up the dns servers from the interface as it's brought up
-			shutit_session.send('cat /etc/resolv.conf'                       note='Nameserver we added has gone')
+			shutit_session.send('cat /etc/resolv.conf',                      note='Nameserver we added has gone')
 			####################################################################
 
 			####################################################################
@@ -195,11 +195,11 @@ echo "
 			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease')
 			shutit_session.send('cat /etc/resolv.conf',                                 note='resolv.conf as before')
 			shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf',note='restore symlink')
-			shutit_session.send('''sed -i 's/^#supersede.*/supersede domain-name-servers 8.8.8.8, 8.8.4.4;/' /etc/dhcp/dhclient.conf''',
+			shutit_session.send("sed -i 's/^#supersede.*/supersede domain-name-servers 8.8.8.8, 8.8.4.4;/' /etc/dhcp/dhclient.conf",
 				                                                                        note='We can override the dns got from dhcp by setting supersed in the dhclient.conf file')
 			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease after supersede added')
 			shutit_session.send('cat /etc/resolv.conf',                                 note='dns settings overridden in the resolv.conf')
-			shutit_session.send('''sed -i 's/^supersede.*/#supersede/' /etc/dhcp/dhclient.conf''',
+			shutit_session.send("sed -i 's/^supersede.*/#supersede/' /etc/dhcp/dhclient.conf",
 				                                                                        note='Revert the supersede setting')
 			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease after supersede removed')
 			shutit_session.send('cat /etc/resolv.conf',                                 note='dns settings reverted')
@@ -229,16 +229,13 @@ echo "
 			####################################################################
 			# Install dnsmasq? See what's changed?
 			####################################################################
-			shutit_session.install('dnsmasq')
-			# dnsmasq running
-			shutit_session.send('ps -ef | grep dnsmasq')
-			# Nothing in here.
-			shutit_session.send('ls -lRt /etc/dnsmasq.d')
-			shutit_session.send('systemctl status dnsmasq')
-			# resolv.conf now points to 127.0.0.1 - dnsmasq has taken over.
-			shutit_session.send('cat /etc/resolv.conf')
-			shutit_session.send('cat /var/run/dnsmasq/resolv.conf')
-			shutit_session.pause_point('cat /var/run/dnsmasq/resolv.conf')
+			shutit_session.install('dnsmasq', echo=False)
+			shutit_session.send('ps -ef | grep dnsmasq',               note='Check whether dnsmasq running')
+			shutit_session.send('ls -lRt /etc/dnsmasq.d',              note='Show dnsmasq config files - not much in there')
+			shutit_session.send('systemctl status --no-pager dnsmasq', note='Get status of dnsmasq')
+			shutit_session.send('cat /etc/resolv.conf',                note='resolv.conf now points to 127.0.0.1 - dnsmasq has taken over!')
+			shutit_session.send('cat /var/run/dnsmasq/resolv.conf',    note='Look at dnsmasq run file for resolv.conf')
+			shutit_session.pause_point('now play')
 
 			# https://foxutech.com/how-to-configure-dnsmasq/
 			#Local Caching using NetworkManager
