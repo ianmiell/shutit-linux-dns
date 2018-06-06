@@ -18,11 +18,11 @@ class shutit_linux_dns(ShutItModule):
 		shutit.build['vagrant_run_dir'] = os.path.dirname(os.path.abspath(inspect.getsourcefile(lambda:0))) + '/vagrant_run'
 		shutit.build['module_name'] = 'shutit_linux_dns_' + ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(6))
 		shutit.build['this_vagrant_run_dir'] = shutit.build['vagrant_run_dir'] + '/' + shutit.build['module_name']
-		shutit.send(' command rm -rf ' + shutit.build['this_vagrant_run_dir'] + ' && command mkdir -p ' + shutit.build['this_vagrant_run_dir'] + ' && command cd ' + shutit.build['this_vagrant_run_dir'])
-		shutit.send('command rm -rf ' + shutit.build['this_vagrant_run_dir'] + ' && command mkdir -p ' + shutit.build['this_vagrant_run_dir'] + ' && command cd ' + shutit.build['this_vagrant_run_dir'])
-		if shutit.send_and_get_output('vagrant plugin list | grep landrush') == '':
-			shutit.send('vagrant plugin install landrush')
-		shutit.send('vagrant init ' + vagrant_image)
+		shutit.send(' command rm -rf ' + shutit.build['this_vagrant_run_dir'] + ' && command mkdir -p ' + shutit.build['this_vagrant_run_dir'] + ' && command cd ' + shutit.build['this_vagrant_run_dir'], echo=False)
+		shutit.send('command rm -rf ' + shutit.build['this_vagrant_run_dir'] + ' && command mkdir -p ' + shutit.build['this_vagrant_run_dir'] + ' && command cd ' + shutit.build['this_vagrant_run_dir'], echo=False)
+		if shutit.send_and_get_output('vagrant plugin list | grep landrush', echo=False) == '':
+			shutit.send('vagrant plugin install landrush', echo=False)
+		shutit.send('vagrant init ' + vagrant_image, echo=False)
 		shutit.send_file(shutit.build['this_vagrant_run_dir'] + '/Vagrantfile','''Vagrant.configure("2") do |config|
   config.landrush.enabled = true
   config.vm.provider "virtualbox" do |vb|
@@ -37,7 +37,7 @@ class shutit_linux_dns(ShutItModule):
       vb.name = "shutit_linux_dns_1"
     end
   end
-end''')
+end''', echo=False)
 
 		# machines is a dict of dicts containing information about each machine for you to use.
 		machines = {}
@@ -60,28 +60,28 @@ end''')
 		# Set up and validate landrush
 		for machine in sorted(machines.keys()):
 			shutit_session = shutit_sessions[machine]
-			shutit_session.send('cd ' + shutit.build['this_vagrant_run_dir'])
+			shutit_session.send('cd ' + shutit.build['this_vagrant_run_dir'], echo=False)
 			# Remove any existing landrush entry.
-			shutit_session.send('vagrant landrush rm ' + machines[machine]['fqdn'])
+			shutit_session.send('vagrant landrush rm ' + machines[machine]['fqdn'], echo=False)
 			# Needs to be done serially for stability reasons.
 			try:
-				shutit_session.multisend('vagrant up --provider ' + shutit.cfg['shutit-library.virtualization.virtualization.virtualization']['virt_method'] + machine_name,{'assword for':pw,'assword:':pw})
+				shutit_session.multisend('vagrant up --provider ' + shutit.cfg['shutit-library.virtualization.virtualization.virtualization']['virt_method'] + machine_name,{'assword for':pw,'assword:':pw}, echo=False)
 			except NameError:
-				shutit_session.multisend('vagrant up ' + machine,{'assword for':pw,'assword:':pw},timeout=99999)
-			if shutit_session.send_and_get_output("vagrant status 2> /dev/null | grep -w ^" + machine + " | awk '{print $2}'") != 'running':
+				shutit_session.multisend('vagrant up ' + machine,{'assword for':pw,'assword:':pw},timeout=99999, echo=False)
+			if shutit_session.send_and_get_output("vagrant status 2> /dev/null | grep -w ^" + machine + " | awk '{print $2}'", echo=False) != 'running':
 				shutit_session.pause_point("machine: " + machine + " appears not to have come up cleanly")
-			ip = shutit_session.send_and_get_output('''vagrant landrush ls 2> /dev/null | grep -w ^''' + machines[machine]['fqdn'] + ''' | awk '{print $2}' ''')
+			ip = shutit_session.send_and_get_output('''vagrant landrush ls 2> /dev/null | grep -w ^''' + machines[machine]['fqdn'] + ''' | awk '{print $2}' ''', echo=False)
 			machines.get(machine).update({'ip':ip})
-			shutit_session.login(command='vagrant ssh ' + machine)
-			shutit_session.login(command='sudo su - ')
+			shutit_session.login(command='vagrant ssh ' + machine, echo=False)
+			shutit_session.login(command='sudo su - ', echo=False)
 			# Correct /etc/hosts
-			shutit_session.send(r'''cat <(echo $(ip -4 -o addr show scope global | grep -v 10.0.2.15 | head -1 | awk '{print $4}' | sed 's/\(.*\)\/.*/\1/') $(hostname)) <(cat /etc/hosts | grep -v $(hostname -s)) > /tmp/hosts && mv -f /tmp/hosts /etc/hosts''')
+			shutit_session.send(r'''cat <(echo $(ip -4 -o addr show scope global | grep -v 10.0.2.15 | head -1 | awk '{print $4}' | sed 's/\(.*\)\/.*/\1/') $(hostname)) <(cat /etc/hosts | grep -v $(hostname -s)) > /tmp/hosts && mv -f /tmp/hosts /etc/hosts''', echo=False)
 			# Correct any broken ip addresses.
-			if shutit_session.send_and_get_output('''vagrant landrush ls | grep ''' + machine + ''' | grep 10.0.2.15 | wc -l''') != '0':
+			if shutit_session.send_and_get_output('''vagrant landrush ls | grep ''' + machine + ''' | grep 10.0.2.15 | wc -l''', echo=False) != '0':
 				shutit_session.log('A 10.0.2.15 landrush ip was detected for machine: ' + machine + ', correcting.',level=logging.WARNING)
 				# This beaut gets all the eth0 addresses from the machine and picks the first one that it not 10.0.2.15.
 				while True:
-					ipaddr = shutit_session.send_and_get_output(r'''ip -4 -o addr show scope global | grep -v 10.0.2.15 | head -1 | awk '{print $4}' | sed 's/\(.*\)\/.*/\1/' ''')
+					ipaddr = shutit_session.send_and_get_output(r'''ip -4 -o addr show scope global | grep -v 10.0.2.15 | head -1 | awk '{print $4}' | sed 's/\(.*\)\/.*/\1/' ''', echo=False)
 					if ipaddr[0] not in ('1','2','3','4','5','6','7','8','9'):
 						time.sleep(10)
 					else:
@@ -92,7 +92,7 @@ end''')
 			shutit.send('vagrant landrush ls | grep -w ' + machines[machine]['fqdn'])
 		# Gather landrush info
 		for machine in sorted(machines.keys()):
-			ip = shutit.send_and_get_output('''vagrant landrush ls 2> /dev/null | grep -w ^''' + machines[machine]['fqdn'] + ''' | awk '{print $2}' ''')
+			ip = shutit.send_and_get_output('''vagrant landrush ls 2> /dev/null | grep -w ^''' + machines[machine]['fqdn'] + ''' | awk '{print $2}' ''', echo=False)
 			machines.get(machine).update({'ip':ip})
 
 
@@ -111,8 +111,8 @@ swapon /swapfile
 swapon -s
 grep -i --color swap /proc/meminfo
 echo "
-/swapfile none            swap    sw              0       0" >> /etc/fstab''')
-			shutit_session.multisend('adduser person',{'Enter new UNIX password':'person','Retype new UNIX password:':'person','Full Name':'','Phone':'','Room':'','Other':'','Is the information correct':'Y'})
+/swapfile none            swap    sw              0       0" >> /etc/fstab''', echo=False)
+			shutit_session.multisend('adduser person',{'Enter new UNIX password':'person','Retype new UNIX password:':'person','Full Name':'','Phone':'','Room':'','Other':'','Is the information correct':'Y'}, echo=False)
 
 		for machine in sorted(machines.keys()):
 			shutit_session = shutit_sessions[machine]
@@ -128,15 +128,15 @@ echo "
 			# NSSWITCH
 			####################################################################
 			# Can we ping ok?
-			shutit_session.send('ping -c1 google.com', note='Basic ping to google.comm works')
-			shutit_session.send('ping -c1 localhost', note='Basic ping to localhost works')
-			shutit_session.send("""sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf""", note='Change nsswitch to only have files')
-			shutit_session.send('ping -c1 google.com', note='google lookup will now fail', check_exit=False)
-			shutit_session.send('ping -c1 localhost', note='But localhost still works, presumably because it is handled by "files"')
-			shutit_session.send("sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf", note='Change nsswitch to only have dns')
-			shutit_session.send('ping -c1 google.com', note='Google can now be pinged')
-			shutit_session.send('ping -c1 localhost', note='But localhost will fail', check_exit=False)
-			shutit_session.send("""sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf""")
+			shutit_session.send('ping -c1 google.com',                                                       note='Basic ping to google.com works')
+			shutit_session.send('ping -c1 localhost',                                                        note='Basic ping to localhost works')
+			shutit_session.send("""sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf""",                note='Change nsswitch to only have files')
+			shutit_session.send('ping -c1 google.com',                                                       note='google lookup will now fail', check_exit=False)
+			shutit_session.send('ping -c1 localhost',                                                        note='But localhost still works, presumably because it is handled by "files"')
+			shutit_session.send("sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf",                      note='Change nsswitch to only have dns')
+			shutit_session.send('ping -c1 google.com',                                                       note='Google can now be pinged')
+			shutit_session.send('ping -c1 localhost',                                                        note='But localhost will fail', check_exit=False)
+			shutit_session.send("""sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf""", note='')
 
 			#####################################################################
 			## getaddrinfo - standard C library?
@@ -148,9 +148,7 @@ echo "
 			# 'Makes sense - a strace of host shows it 'just' goes to /etc/resolv.conf, while ping (for example) looks up nsswitch.' (and gai.conf) etc
 			# Can use gai.conf to hack ipv4 over ipv6 without switching ipv6 off.
 			# https://community.rackspace.com/products/f/public-cloud-forum/5110/how-to-prefer-ipv4-over-ipv6-in-ubuntu-and-centos
-			# eg JAVA has its own dns lookup?
-			shutit_session.send('strace -e trace=openat -f host google.com',note='Host does not use nsswitch, just resolv.conf.')
-			# ping references nsswitch
+			shutit_session.send('strace -e trace=openat -f host google.com',     note='Host does not use nsswitch, just resolv.conf.')
 			shutit_session.send('strace -e trace=openat -f ping -c1 google.com', note='Ping does use nsswitch.')
 
 			####################################################################
@@ -158,61 +156,54 @@ echo "
 			####################################################################
 			# Show resolv.conf is the resolver
 			# Change resolv.conf by hand
-			shutit_session.send('ls -l /etc/resolv.conf',note='resolvconf turns /etc/resolv.conf into a symlink to the /run folder.')
+			shutit_session.send('ls -l /etc/resolv.conf',                               note='resolvconf turns /etc/resolv.conf into a symlink to the /run folder.')
 			shutit_session.send("sed -i 's/^nameserver/#nameserver/' /etc/resolv.conf", note='Take nameserver out of /etc/resolv.conf')
-			shutit_session.send('ping -c1 google.com', note='google will fail, no nameserver specified by /etc/resolv.conf', check_exit=False)
+			shutit_session.send('ping -c1 google.com',                                  note='google will fail, no nameserver specified by /etc/resolv.conf', check_exit=False)
 			shutit_session.send("sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf", note='put nameserver back')
-			shutit_session.send('ping -c1 google.com', note='ping works again')
+			shutit_session.send('ping -c1 google.com',                                  note='ping works again')
 
 			# So Where does resolvconf get its info from?
 			# Plug in a log file triggered whenever the 000resolvconf script gets run
-			shutit_session.send("""sed -i '2s@^.*@echo I am triggered by ifup > /tmp/000resolvconf.log@' /etc/network/if-up.d/000resolvconf""")
+			shutit_session.send("sed -i '2s@^.*@echo I am triggered by ifup > /tmp/000resolvconf.log@' /etc/network/if-up.d/000resolvconf",note='Add a probe within the 000resolvconf file to prove when it is triggered.')
 			# Running ifup/ifdown triggers it...
-			shutit_session.send('ifdown enp0s8', note='Bring network interface down')
-			shutit_session.send('ls /tmp/000resolvconf.log', note='File not created on ifdown', check_exit=False)
-			shutit_session.send('ifup enp0s8')
-			shutit_session.send('cat /tmp/000resolvconf.log')
-			# Remove it
-			shutit_session.send('rm /tmp/000resolvconf.log')
-			# Restart networking
-			shutit_session.send('systemctl restart networking')
-			# The file is back - it also triggered the script
-			shutit_session.send('cat /tmp/000resolvconf.log')
+			shutit_session.send('ifdown enp0s8',                note='Bring network interface down')
+			shutit_session.send('ls /tmp/000resolvconf.log',    note='File not created on ifdown', check_exit=False)
+			shutit_session.send('ifup enp0s8'                   note='Bring up network interface, which triggers probe above')
+			shutit_session.send('cat /tmp/000resolvconf.log'    note='File has now been created')
+			shutit_session.send('rm /tmp/000resolvconf.log'     note='Remove that file')
+			shutit_session.send('systemctl restart networking', note='Restart networking')
+			shutit_session.send('cat /tmp/000resolvconf.log',   note='The file is back - it also triggered the script')
 
-			# Resolvconf adds the nameserver to the interface. Normally interface gets this on creation
-			shutit_session.send('''echo 'nameserver 10.10.10.10' | /sbin/resolvconf -a enp0s8.inet''')
+			shutit_session.send('''echo 'nameserver 10.10.10.10' | /sbin/resolvconf -a enp0s8.inet''', note='Resolvconf can adds the nameserver to the interface. Normally interface gets this on creation eg from DHCP (see later)')
 			# Creates the runtime entry here
-			shutit_session.send('''cat /run/resolvconf/interface/enp0s8.inet''')
-			# Updates the resolv.conf
-			shutit_session.send('resolvconf -u')
-			shutit_session.send('cat /etc/resolv.conf')
+			shutit_session.send('cat /run/resolvconf/interface/enp0s8.inet', note='10.10.10.10 should now be seen in the run file for this interface')
+			shutit_session.send('resolvconf -u',                             note='Updates the resolv.conf')
+			shutit_session.send('cat /etc/resolv.conf',                      note='Resolv.conf before network restart')
+			shutit_session.send('systemctl restart networking',              note='Restart networking')
 			# Restart networking removes this... so presumably picks up the dns servers from the interface as it's brought up
-			shutit_session.send('systemctl restart networking')
-			shutit_session.send('cat /etc/resolv.conf')
+			shutit_session.send('cat /etc/resolv.conf'                       note='Nameserver we added has gone')
 			####################################################################
 
 			####################################################################
-			# How does interface know 
-			# dhclient? https://jameshfisher.com/2018/02/06/what-is-dhcp
+			# How does interface know: dhclient? https://jameshfisher.com/2018/02/06/what-is-dhcp
 			####################################################################
-			shutit_session.send('find /run | grep dh')
-			shutit_session.send('ps -ef | grep dhclient')
-			shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s3.leases')
-			shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s8.leases')
+			shutit_session.send('find /run | grep dh',                                  note='Hunt for dhcp files')
+			shutit_session.send('ps -ef | grep dhclient',                               note='Hunt for dhclient processes')
+			shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s3.leases',             note='Interface 3 lease')
+			shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s8.leases',             note='Interface 8 lease')
 			# TODO supercede: https://unix.stackexchange.com/questions/136117/ignore-dns-from-dhcp-server-in-ubuntu?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
-			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease')
-			shutit_session.send('cat /etc/resolv.conf', note='resolv.conf as before')
-			shutit_session.send('''sed -i 's/^#supersede.*/supersede domain-name-servers 8.8.8.8, 8.8.4.4;/' /etc/dhcp/dhclient.conf''')
-			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease after supersede added')
-			shutit_session.send('cat /etc/resolv.conf',note='dns settings overridden')
-			shutit_session.send('''sed -i 's/^supersede.*/#supersede/' /etc/dhcp/dhclient.conf''')
-			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',note='Recreate the DHCP lease after supersede removed')
-			shutit_session.send('cat /etc/resolv.conf',note='dns settings reverted')
-			shutit_session.pause_point('''dhclient: cat /etc/dhcp/dhclient.conf
-domain home
-nameserver 10.0.2.2
-			change the conf to not get dns?''')
-			shutit_session.send('cat /run/resolvconf/interface/enp0s3.dhclient')
+			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease')
+			shutit_session.send('cat /etc/resolv.conf',                                 note='resolv.conf as before')
+			shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf',note='restore symlink')
+			shutit_session.send('''sed -i 's/^#supersede.*/supersede domain-name-servers 8.8.8.8, 8.8.4.4;/' /etc/dhcp/dhclient.conf''',
+				                                                                        note='We can override the dns got from dhcp by setting supersed in the dhclient.conf file')
+			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease after supersede added')
+			shutit_session.send('cat /etc/resolv.conf',                                 note='dns settings overridden in the resolv.conf')
+			shutit_session.send('''sed -i 's/^supersede.*/#supersede/' /etc/dhcp/dhclient.conf''',
+				                                                                        note='Revert the supersede setting')
+			shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease after supersede removed')
+			shutit_session.send('cat /etc/resolv.conf',                                 note='dns settings reverted')
+			shutit_session.send('cat /run/resolvconf/interface/enp0s3.dhclient',        note='dhclient settings now in /run')
 
 			#####################################################################
 			# PART II
