@@ -222,6 +222,7 @@ echo "
 
 			#####################################################################
 			## Install NetworkManager? More about interfaces than anything else
+			# Wrapper around networking service that can do more than ifup/ifdown
 			####################################################################
 			#shutit_session.install('network-manager')
 			#shutit_session.send('ls /etc/NetworkManager')
