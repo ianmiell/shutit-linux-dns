@@ -30,7 +30,7 @@ def walkthrough(shutit_session):
 
 
 	####################################################################
-	# resolvconf
+	# resolv.conf
 	####################################################################
 	# Show resolv.conf is the resolver
 	# Change resolv.conf by hand
@@ -41,6 +41,12 @@ def walkthrough(shutit_session):
 	shutit_session.send("sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf", note='put nameserver back')
 	shutit_session.send('ping -c1 google.com',                                  note='ping works again')
 	shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf',note='restore symlink')
+	# TODO: change search and show what that does.
+	shutit_session.pause_point('TODO: change search and show what that does.')
+
+	#####################################################################
+	# PART II
+	#####################################################################
 
 	# So Where does resolvconf get its info from?
 	# Plug in a log file triggered whenever the 000resolvconf script gets run
@@ -87,9 +93,6 @@ def walkthrough(shutit_session):
 
 
 
-	#####################################################################
-	# PART II
-	#####################################################################
 
 	#####################################################################
 	## Start systemd-resolved - seems different in vagrant?
