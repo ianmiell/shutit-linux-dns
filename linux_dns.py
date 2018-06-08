@@ -41,13 +41,14 @@ def walkthrough(shutit_session):
 	shutit_session.send("sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf", note='put nameserver back')
 	shutit_session.send('ping -c1 google.com',                                  note='ping works again')
 	shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf',note='restore symlink')
-	# TODO: change search and show what that does.
-	shutit_session.pause_point('TODO: change search and show what that does.')
-
+	shutit_session.send('ping -c1 google', check_exit=False,                    note='Pinging just google fails')
+	shutit_session.send('echo search com >> /etc/resolv.conf',                  note='add com to search domain')
+	shutit_session.send('ping -c1 google',                                      note='Pinging just google now works')
+	shutit_session.send("sed -i '$d' /etc/resolv.conf",                         note='Revert /etc/resolv.conf')
+	
 	#####################################################################
 	# PART II
 	#####################################################################
-
 	# So Where does resolvconf get its info from?
 	# Plug in a log file triggered whenever the 000resolvconf script gets run
 	shutit_session.send("sed -i '2s@^.*@echo I am triggered by ifup > /tmp/000resolvconf.log@' /etc/network/if-up.d/000resolvconf",note='Add a probe within the 000resolvconf file to prove when it is triggered.')
