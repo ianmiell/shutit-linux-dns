@@ -3,38 +3,37 @@ def walkthrough(shutit_session):
 	# PART I
 	#####################################################################
 
+	#####################################################################
+	## getaddrinfo - standard C library call... but not everything uses this.
+	#####################################################################
+	shutit_session.send('strace -e trace=openat -f host google.com',     note='Observe (using a strace) that host does not use nsswitch, just references resolv.conf direct.')
+	shutit_session.send('strace -e trace=openat -f ping -c1 google.com', note='ping, by contrast does reference nsswitch.')
+	# gai.conf?
+	# You can use gai.conf to hack ipv4 over ipv6 without switching ipv6 off.
+	# https://community.rackspace.com/products/f/public-cloud-forum/5110/how-to-prefer-ipv4-over-ipv6-in-ubuntu-and-centos
+
 	####################################################################
 	# NSSWITCH
 	####################################################################
 	# Can we ping ok?
-	shutit_session.send('ping -c1 google.com',                                                       note='Basic ping to google.com works')
-	shutit_session.send('ping -c1 localhost',                                                        note='Basic ping to localhost works')
-	shutit_session.send("sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf",                    note='Change nsswitch to only have files')
-	shutit_session.send('ping -c1 google.com',                                                       note='google lookup will now fail', check_exit=False)
-	shutit_session.send('ping -c1 localhost',                                                        note='But localhost still works, presumably because it is handled by /etc/hosts (aka "files"')
-	shutit_session.send("sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf",                      note='Change nsswitch to only have dns')
-	shutit_session.send('ping -c1 google.com',                                                       note='Google can now be pinged')
-	shutit_session.send('ping -c1 localhost',                                                        note='But localhost will fail as /etc/hosts not referenced', check_exit=False)
-	shutit_session.send("sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf",     note='Revert nsswitch to where it was')
+	shutit_session.send('ping -c1 google.com',                                                       note='Basic ping on vanilla linux VM to google.com works')
+	shutit_session.send('ping -c1 localhost',                                                        note='Basic ping to localhost also works')
+	shutit_session.send("sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf",                    note='Now change nsswitch to only have files rather than "files dns myhostname"')
+	shutit_session.send('ping -c1 google.com',                                                       note='google lookup will now fail, as nsswitch does not refer to dns', check_exit=False)
+	shutit_session.send('ping -c1 localhost',                                                        note='But localhost still works, because it is handled by the /etc/hosts file (aka "files"')
+	shutit_session.send('cat /etc/hosts',                                                            note='/etc/hosts has localhost in it')
+	shutit_session.send("sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf",                      note='Now change nsswitch to only have dns')
+	shutit_session.send('ping -c1 google.com',                                                       note='Google can now be pinged, as dns is in nsswitch config')
+	shutit_session.send('ping -c1 localhost',                                                        note='But localhost will fail as /etc/hosts ("files") not referenced by nsswitch', check_exit=False)
+	shutit_session.send("sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf",     note='Finally, revert nsswitch to where it was to restore to original state')
 
-	#####################################################################
-	## getaddrinfo - standard C library?
-	#####################################################################
-	# https://jameshfisher.com/2018/02/03/what-does-getaddrinfo-do
-	# BUT WAIT THERE'S STILL MORE! After our process has its DNS responses, it does more work. It starts by reading /etc/gai.conf, the Configuration for getaddrinfo(3). The function call has its very own configuration file! Luckily, mine is only comments.
-	# Not everything uses gai - eg ping vs host.
-	shutit_session.send('strace -e trace=openat -f host google.com',     note='Host does not use nsswitch, just resolv.conf.')
-	shutit_session.send('strace -e trace=openat -f ping -c1 google.com', note='Ping does use nsswitch.')
-
-	# gai.conf?
-	# Can use gai.conf to hack ipv4 over ipv6 without switching ipv6 off.
-	# https://community.rackspace.com/products/f/public-cloud-forum/5110/how-to-prefer-ipv4-over-ipv6-in-ubuntu-and-centos
 
 	####################################################################
 	# resolvconf
 	####################################################################
 	# Show resolv.conf is the resolver
 	# Change resolv.conf by hand
+	shutit_session.send('cat /etc/resolv.conf',                                 note='resolvconf turns /etc/resolv.conf into a symlink to the /run folder.')
 	shutit_session.send('ls -l /etc/resolv.conf',                               note='resolvconf turns /etc/resolv.conf into a symlink to the /run folder.')
 	shutit_session.send("sed -i 's/^nameserver/#nameserver/' /etc/resolv.conf", note='Take nameserver out of /etc/resolv.conf')
 	shutit_session.send('ping -c1 google.com',                                  note='google will fail, no nameserver specified by /etc/resolv.conf', check_exit=False)
