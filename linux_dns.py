@@ -20,7 +20,7 @@ def walkthrough(shutit_session):
 	shutit_session.send("sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf",                    note='Now change nsswitch to only have files rather than "files dns myhostname"')
 	shutit_session.send('ping -c1 google.com', check_exit=False,                                     note='google lookup will now fail, as nsswitch does not refer to dns')
 	shutit_session.send('host google.com',                                                           note='But host still works - it does not care about nsswitch.')
-	shutit_session.send('ping -c1 localhost',                                                        note='And localhost still works, because it is handled by the /etc/hosts file (aka "files"')
+	shutit_session.send('ping -c1 localhost',                                                        note='And localhost still works, because it is handled by the /etc/hosts file (aka "files")')
 	shutit_session.send('cat /etc/hosts',                                                            note='/etc/hosts has localhost in it')
 	shutit_session.send("sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf",                      note='Now change nsswitch to only have dns')
 	shutit_session.send('ping -c1 google.com',                                                       note='Google can now be pinged, as dns is in nsswitch config')
