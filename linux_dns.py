@@ -8,16 +8,15 @@ def walkthrough(shutit_session):
 	#####################################################################
 	shutit_session.send('strace -e trace=open -f host google.com',     note='Observe (using a strace) that host does not use nsswitch, just references resolv.conf direct.')
 	shutit_session.send('strace -e trace=open -f ping -c1 google.com', note='ping, by contrast does reference nsswitch.')
-	# gai.conf?
-	# You can use gai.conf to hack ipv4 over ipv6 without switching ipv6 off.
+	# gai.conf? You can use gai.conf (for example) to hack ipv4 over ipv6 without switching ipv6 off.
 	# https://community.rackspace.com/products/f/public-cloud-forum/5110/how-to-prefer-ipv4-over-ipv6-in-ubuntu-and-centos
 
 	####################################################################
 	# NSSWITCH
 	####################################################################
-	# Can we ping ok?
 	shutit_session.send('ping -c1 google.com',                                                       note='Basic ping on vanilla linux VM to google.com works')
 	shutit_session.send('ping -c1 localhost',                                                        note='Basic ping to localhost also works')
+	shutit_session.send('ping -c1 linuxdns1',                                                        note='Basic ping to myhostname also works')
 	shutit_session.send("sed -i 's/hosts: .*/hosts: files/g' /etc/nsswitch.conf",                    note='Now change nsswitch to only have files rather than "files dns myhostname"')
 	shutit_session.send('ping -c1 google.com', check_exit=False,                                     note='google lookup will now fail, as nsswitch does not refer to dns')
 	shutit_session.send('host google.com',                                                           note='But host still works - it does not care about nsswitch.')
@@ -25,7 +24,8 @@ def walkthrough(shutit_session):
 	shutit_session.send('cat /etc/hosts',                                                            note='/etc/hosts has localhost in it')
 	shutit_session.send("sed -i 's/hosts: .*/hosts: dns/g' /etc/nsswitch.conf",                      note='Now change nsswitch to only have dns')
 	shutit_session.send('ping -c1 google.com',                                                       note='Google can now be pinged, as dns is in nsswitch config')
-	shutit_session.send('ping -c1 localhost',                                                        note='But localhost will fail as /etc/hosts ("files") not referenced by nsswitch', check_exit=False)
+	shutit_session.send('ping -c1 localhost', check_exit=False,                                      note='But localhost will fail as /etc/hosts ("files") not referenced by nsswitch')
+	shutit_session.send('ping -c1 linuxdns1', check_exit=False,                                      note='But my hostname will fail as /etc/hosts and /etc/hostname ("myhostname") not referenced by nsswitch')
 	shutit_session.send("sed -i 's/hosts: .*/hosts: files dns myhostname/g' /etc/nsswitch.conf",     note='Finally, revert nsswitch to where it was to restore to original state')
 
 
@@ -34,10 +34,10 @@ def walkthrough(shutit_session):
 	####################################################################
 	# Show resolv.conf is the resolver
 	# Change resolv.conf by hand
-	shutit_session.send('cat /etc/resolv.conf',                                 note='resolvconf turns /etc/resolv.conf into a symlink to the /run folder.')
+	shutit_session.send('cat /etc/resolv.conf',                                 note='Contents of /etc/resolv.conf')
 	shutit_session.send('ls -l /etc/resolv.conf',                               note='resolvconf turns /etc/resolv.conf into a symlink to the /run folder.')
 	shutit_session.send("sed -i 's/^nameserver/#nameserver/' /etc/resolv.conf", note='Take nameserver out of /etc/resolv.conf')
-	shutit_session.send('ping -c1 google.com',                                  note='google will fail, no nameserver specified by /etc/resolv.conf', check_exit=False)
+	shutit_session.send('ping -c1 google.com', check_exit=False,                note='google will fail, no nameserver specified by /etc/resolv.conf')
 	shutit_session.send("sed -i 's/^#nameserver/nameserver/' /etc/resolv.conf", note='put nameserver back')
 	shutit_session.send('ping -c1 google.com',                                  note='ping works again')
 	shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf',note='restore symlink')
@@ -46,13 +46,13 @@ def walkthrough(shutit_session):
 	# Plug in a log file triggered whenever the 000resolvconf script gets run
 	shutit_session.send("sed -i '2s@^.*@echo I am triggered by ifup > /tmp/000resolvconf.log@' /etc/network/if-up.d/000resolvconf",note='Add a probe within the 000resolvconf file to prove when it is triggered.')
 	# Running ifup/ifdown triggers it...
-	shutit_session.send('ifdown enp0s8',                note='Bring network interface down')
-	shutit_session.send('ls /tmp/000resolvconf.log',    note='File not created on ifdown', check_exit=False)
-	shutit_session.send('ifup enp0s8',                  note='Bring up network interface, which triggers probe above')
-	shutit_session.send('cat /tmp/000resolvconf.log',   note='File has now been created')
-	shutit_session.send('rm /tmp/000resolvconf.log',    note='Remove that file')
-	shutit_session.send('systemctl restart networking', note='Restart networking')
-	shutit_session.send('cat /tmp/000resolvconf.log',   note='The file is back - it also triggered the script')
+	shutit_session.send('ifdown enp0s8',                               note='Bring network interface down')
+	shutit_session.send('ls /tmp/000resolvconf.log', check_exit=False, note='File not created on ifdown')
+	shutit_session.send('ifup enp0s8',                                 note='Bring up network interface, which triggers probe above')
+	shutit_session.send('cat /tmp/000resolvconf.log',                  note='File has now been created')
+	shutit_session.send('rm /tmp/000resolvconf.log',                   note='Remove that file')
+	shutit_session.send('systemctl restart networking',                note='Restart networking')
+	shutit_session.send('cat /tmp/000resolvconf.log',                  note='The file is back - it also triggered the script')
 
 	shutit_session.send('''echo 'nameserver 10.10.10.10' | /sbin/resolvconf -a enp0s8.inet''', note='Resolvconf can adds the nameserver to the interface. Normally interface gets this on creation eg from DHCP (see later)')
 	# Creates the runtime entry here
