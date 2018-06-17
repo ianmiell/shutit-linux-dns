@@ -12,6 +12,7 @@ from shutit_module import ShutItModule
 class shutit_linux_dns(ShutItModule):
 
 	def build(self, shutit):
+		shutit.send('sleep 20')
 		vagrant_image = shutit.cfg[self.module_id]['vagrant_image']
 		vagrant_provider = shutit.cfg[self.module_id]['vagrant_provider']
 		gui = shutit.cfg[self.module_id]['gui']
