@@ -49,6 +49,150 @@ def walkthrough(shutit_session):
 	#####################################################################
 	# PART II
 	#####################################################################
+
+	# This is now for ubuntu
+	shutit_session.send('echo nameserver 10.10.10.10 >> /etc/resolv.conf', note='Add a nameserver by hand')
+	shutit_session.send('cat /etc/resolv.conf',                            note='Resolv.conf before network restart')
+	shutit_session.send('systemctl restart networking',                    note='Restart networking')
+	shutit_session.send('cat /etc/resolv.conf',                            note='Resolv.conf after network restart')
+
+
+	# Can be 'hacked' with resolvconf -u
+	# So Where does resolvconf get its info from?
+	shutit_session.send('''echo 'nameserver 10.10.10.10' | /sbin/resolvconf -a enp0s8.inet''', note='Resolvconf can adds the nameserver to the interface. Normally interface gets this on creation eg from DHCP (see later)')
+	# Creates the runtime entry here
+	shutit_session.send('cat /run/resolvconf/interface/enp0s8.inet', note='10.10.10.10 should now be seen in the run file for this interface')
+	shutit_session.send('resolvconf -u',                             note='Updates the resolv.conf')
+	shutit_session.send('cat /etc/resolv.conf',                      note='Resolv.conf before network restart')
+	shutit_session.send('systemctl restart networking',              note='Restart networking')
+	# Type=oneshot
+	# EnvironmentFile=-/etc/default/networking
+	# ExecStartPre=-/bin/sh -c '[ "$CONFIGURE_INTERFACES" != "no" ] && [ -n "$(ifquery --read-environment --list --exclude=lo)" ] && udevadm settle'
+	# ExecStart=/sbin/ifup -a --read-environment
+	# ExecStop=/sbin/ifdown -a --read-environment --exclude=lo
+	# RemainAfterExit=true
+
+	# ifdown is called first - this triggers a dhclient reset
+	# exclude is a trick to stop this ssh session from being killed off
+	shutit_session.send('/sbin/ifdown -a --read-environment --exclude=enp0s3')
+	shutit_session.send('/sbin/ifup -a --read-environment')
+
+# Also of interest here:
+	# https://unix.stackexchange.com/questions/339189/undocumented-read-environment-in-ifup-ifdown-ifquery
+	# https://access.redhat.com/solutions/27166 - what does ifup do that ifconfig does not
+	# [Service]
+
+
+
+	####################################################################
+	# How does interface know: dhclient (see above)? https://jameshfisher.com/2018/02/06/what-is-dhcp
+	####################################################################
+	shutit_session.send('find /run | grep dh',                                  note='Hunt for dhcp files')
+	shutit_session.send('ps -ef | grep dhclient',                               note='Hunt for dhclient processes')
+	shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s3.leases',             note='Interface 3 lease')
+	shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s8.leases',             note='Interface 8 lease')
+	# TODO supercede: https://unix.stackexchange.com/questions/136117/ignore-dns-from-dhcp-server-in-ubuntu?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
+	shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease')
+	shutit_session.send('cat /etc/resolv.conf',                                 note='resolv.conf as before')
+	shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf',note='restore symlink')
+	shutit_session.send("sed -i 's/^#supersede.*/supersede domain-name-servers 8.8.8.8, 8.8.4.4;/' /etc/dhcp/dhclient.conf",
+		                                                                        note='We can override the dns got from dhcp by setting supersed in the dhclient.conf file')
+	shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease after supersede added')
+	shutit_session.send('cat /etc/resolv.conf',                                 note='dns settings overridden in the resolv.conf')
+	shutit_session.send("sed -i 's/^supersede.*/#supersede/' /etc/dhcp/dhclient.conf",
+		                                                                        note='Revert the supersede setting')
+	shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease after supersede removed')
+	shutit_session.send('cat /etc/resolv.conf',                                 note='dns settings reverted')
+	shutit_session.send('cat /run/resolvconf/interface/enp0s3.dhclient',        note='dhclient settings now in /run')
+
+
+
+	#####################################################################
+	# PART III
+	#####################################################################
+
+
+	shutit_session.pause_point('systemd-resolved or NetworkManager')
+	#####################################################################
+	## Install NetworkManager? More about interfaces than anything else
+	####################################################################
+	#shutit_session.install('network-manager')
+	#shutit_session.send('ls /etc/NetworkManager')
+	#shutit_session.send('cat /etc/NetworkManager/NetworkManager.conf')
+
+
+	#####################################################################
+	## Start systemd-resolved - seems different in vagrant?
+	####################################################################
+	#shutit_session.send('systemctl enable systemd-resolved')
+	#shutit_session.send('systemctl start systemd-resolved')
+	#shutit_session.send('cat /etc/resolv.conf')
+	##https://wiki.ubuntu.com/OverrideDNSServers
+
+
+
+	####################################################################
+	# Install dnsmasq? See what's changed?
+	####################################################################
+	shutit_session.install('dnsmasq', echo=False)
+	shutit_session.send('ps -ef | grep dnsmasq',               note='Check whether dnsmasq running')
+	shutit_session.send('ls -lRt /etc/dnsmasq.d',              note='Show dnsmasq config files - not much in there')
+	shutit_session.send('systemctl status --no-pager dnsmasq', note='Get status of dnsmasq')
+	shutit_session.send('cat /etc/resolv.conf',                note='resolv.conf now points to 127.0.0.1 - dnsmasq has taken over!')
+	shutit_session.send('cat /var/run/dnsmasq/resolv.conf',    note='Look at dnsmasq run file for resolv.conf')
+	# TODO: set dnsmasq to log queries with log-queries
+	shutit_session.pause_point('now play')
+
+	# https://foxutech.com/how-to-configure-dnsmasq/
+	#Local Caching using NetworkManager
+	#Set this in /etc/NetworkManager/NetworkManager.conf:
+	#[main]
+	#dns=dnsmasq
+	#and restart network-manager service.
+
+	#root@linuxdns1:/etc# ls -lRt | grep 15:28
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc0.d
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc1.d
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc2.d
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc3.d
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc4.d
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc5.d
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc6.d
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 insserv.conf.d
+	#drwxr-xr-x 3 root root    4096 Jun  1 15:28 default
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 init.d
+	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 dnsmasq.d
+	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
+	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
+	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
+	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
+	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
+	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
+	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
+	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
+	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
+	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
+	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
+	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
+	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
+	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
+	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
+	#drwxr-xr-x 2 root root 4096 Jun  1 15:28 system.d
+	#drwxr-xr-x 2 root root 4096 Jun  1 15:28 update.d
+	#drwxr-xr-x 2 root root 4096 Jun  1 15:28 multi-user.target.wants
+	#lrwxrwxrwx 1 root root 35 Jun  1 15:28 dnsmasq.service -> /lib/systemd/system/dnsmasq.service
+
+	####################################################################
+	# Install NCSD?
+	####################################################################
+	# The answer is that local processes don't know to connect to /var/run/nscd/socket. Or rather, some do, and some don't. The processes that do know about /var/run/nscd/socket are those linked against glibc and using getaddrinfo from that library.  Only GNU's implementation of the C standard library has the knowledge of /var/run/nscd/socket. If your process is linked against a different libc (e.g. musl), or if your process uses a different runtime (e.g. the Go runtime), it knows nothing of /var/run/nscd/socket. This is your first reason for not using nscd.
+
+	####################################################################
+	# Install landrush
+	####################################################################
+
+
+
 #The next part is the fun one, where you find out some lying piece of shit service
 #is silently replacing resolve.conf with garbage and/or running a local DNS proxy
 #with an opaque configuration that it redirects every request through.
@@ -110,32 +254,8 @@ def walkthrough(shutit_session):
 #
 #Thanks for the write-up. I hope this helps.
 
-	# This is now for ubuntu
-	shutit_session.send('echo nameserver 10.10.10.10 >> /etc/resolv.conf', note='Add a nameserver by hand')
-	shutit_session.send('cat /etc/resolv.conf',                            note='Resolv.conf before network restart')
-	shutit_session.send('systemctl restart networking',                    note='Restart networking')
-	shutit_session.send('cat /etc/resolv.conf',                            note='Resolv.conf after network restart')
 
-
-	# Can be 'hacked' with resolvconf -u
-	# So Where does resolvconf get its info from?
-	shutit_session.send('''echo 'nameserver 10.10.10.10' | /sbin/resolvconf -a enp0s8.inet''', note='Resolvconf can adds the nameserver to the interface. Normally interface gets this on creation eg from DHCP (see later)')
-	# Creates the runtime entry here
-	shutit_session.send('cat /run/resolvconf/interface/enp0s8.inet', note='10.10.10.10 should now be seen in the run file for this interface')
-	shutit_session.send('resolvconf -u',                             note='Updates the resolv.conf')
-	shutit_session.send('cat /etc/resolv.conf',                      note='Resolv.conf before network restart')
-	shutit_session.send('systemctl restart networking',              note='Restart networking')
-	shutit_session.pause_point('what does systemctl restart networking actually do?')
-	# Type=oneshot
-	# EnvironmentFile=-/etc/default/networking
-	# ExecStartPre=-/bin/sh -c '[ "$CONFIGURE_INTERFACES" != "no" ] && [ -n "$(ifquery --read-environment --list --exclude=lo)" ] && udevadm settle'
-	# ExecStart=/sbin/ifup -a --read-environment
-	# ExecStop=/sbin/ifdown -a --read-environment --exclude=lo
-	# RemainAfterExit=true
-
-	# ifdown is called first - this triggers a dhclient reset
-	# exclude is a trick to stop this ssh session from being killed off
-	shutit_session.send('/sbin/ifdown -a --read-environment --exclude=enp0s3')
+#	shutit_session.send('/sbin/ifdown -a --read-environment --exclude=enp0s3')
 #Jun 16 17:15:33 linuxdns1 dhclient[1651]: DHCPREQUEST of 172.28.128.3 on enp0s8 to 172.28.128.2 port 67 (xid=0x56b9609)
 #Jun 16 17:15:33 linuxdns1 dhclient[1651]: DHCPACK of 172.28.128.3 from 172.28.128.2
 #Jun 16 17:15:33 linuxdns1 dhclient[1651]: bound to 172.28.128.3 -- renewal in 527 seconds.
@@ -161,7 +281,8 @@ def walkthrough(shutit_session):
 #Jun 16 17:15:37 linuxdns1 dhclient[11446]: Sending on   Socket/fallback
 #Jun 16 17:15:37 linuxdns1 dhclient[11446]: DHCPRELEASE on enp0s8 to 172.28.128.2 port 67 (xid=0x39c7499a)
 #Jun 16 17:15:37 linuxdns1 dhclient[1651]: receive_packet failed on enp0s8: Network is down
-	shutit_session.send('/sbin/ifup -a --read-environment')
+
+
 
 #root@linuxdns1:/etc# systemctl restart networking
 #Jun 16 17:13:21 linuxdns1 systemd[1]: Stopped Raise network interfaces.
@@ -238,12 +359,6 @@ def walkthrough(shutit_session):
 #Jun 16 17:13:25 linuxdns1 systemd[1]: Started Raise network interfaces.
 
 
-# Also of interest here:
-	# https://unix.stackexchange.com/questions/339189/undocumented-read-environment-in-ifup-ifdown-ifquery
-	# https://access.redhat.com/solutions/27166 - what does ifup do that ifconfig does not
-	# [Service]
-
-
 ###############
 # IFUP
 ###############
@@ -316,107 +431,4 @@ def walkthrough(shutit_session):
 #  execve("/bin/systemctl", ["systemctl", "-p", "LoadState", "show", "upstart.service"], [/* 9 vars */]) = 0
 #  execve("/bin/readlink", ["readlink", "-f", "/etc/network/if-up.d/upstart"], [/* 9 vars */]) = 0
 #  execve("/bin/plymouth", ["plymouth", "--ping"], [/* 9 vars */]) = 0
-	####################################################################
-
-	####################################################################
-	# How does interface know: dhclient (see above)? https://jameshfisher.com/2018/02/06/what-is-dhcp
-	####################################################################
-	shutit_session.send('find /run | grep dh',                                  note='Hunt for dhcp files')
-	shutit_session.send('ps -ef | grep dhclient',                               note='Hunt for dhclient processes')
-	shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s3.leases',             note='Interface 3 lease')
-	shutit_session.send('cat /var/lib/dhcp/dhclient.enp0s8.leases',             note='Interface 8 lease')
-	# TODO supercede: https://unix.stackexchange.com/questions/136117/ignore-dns-from-dhcp-server-in-ubuntu?utm_medium=organic&utm_source=google_rich_qa&utm_campaign=google_rich_qa
-	shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease')
-	shutit_session.send('cat /etc/resolv.conf',                                 note='resolv.conf as before')
-	shutit_session.send('ln -f -s /run/resolvconf/resolv.conf /etc/resolv.conf',note='restore symlink')
-	shutit_session.send("sed -i 's/^#supersede.*/supersede domain-name-servers 8.8.8.8, 8.8.4.4;/' /etc/dhcp/dhclient.conf",
-		                                                                        note='We can override the dns got from dhcp by setting supersed in the dhclient.conf file')
-	shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease after supersede added')
-	shutit_session.send('cat /etc/resolv.conf',                                 note='dns settings overridden in the resolv.conf')
-	shutit_session.send("sed -i 's/^supersede.*/#supersede/' /etc/dhcp/dhclient.conf",
-		                                                                        note='Revert the supersede setting')
-	shutit_session.send('dhclient -r enp0s8 && dhclient -v enp0s8',             note='Recreate the DHCP lease after supersede removed')
-	shutit_session.send('cat /etc/resolv.conf',                                 note='dns settings reverted')
-	shutit_session.send('cat /run/resolvconf/interface/enp0s3.dhclient',        note='dhclient settings now in /run')
-
-
-
-	#####################################################################
-	# PART III
-	#####################################################################
-
-
-	#####################################################################
-	## Start systemd-resolved - seems different in vagrant?
-	####################################################################
-	#shutit_session.send('systemctl enable systemd-resolved')
-	#shutit_session.send('systemctl start systemd-resolved')
-	#shutit_session.send('cat /etc/resolv.conf')
-	##https://wiki.ubuntu.com/OverrideDNSServers
-
-	#####################################################################
-	## Install NetworkManager? More about interfaces than anything else
-	####################################################################
-	#shutit_session.install('network-manager')
-	#shutit_session.send('ls /etc/NetworkManager')
-	#shutit_session.send('cat /etc/NetworkManager/NetworkManager.conf')
-
-
-	####################################################################
-	# Install dnsmasq? See what's changed?
-	####################################################################
-	shutit_session.install('dnsmasq', echo=False)
-	shutit_session.send('ps -ef | grep dnsmasq',               note='Check whether dnsmasq running')
-	shutit_session.send('ls -lRt /etc/dnsmasq.d',              note='Show dnsmasq config files - not much in there')
-	shutit_session.send('systemctl status --no-pager dnsmasq', note='Get status of dnsmasq')
-	shutit_session.send('cat /etc/resolv.conf',                note='resolv.conf now points to 127.0.0.1 - dnsmasq has taken over!')
-	shutit_session.send('cat /var/run/dnsmasq/resolv.conf',    note='Look at dnsmasq run file for resolv.conf')
-	shutit_session.pause_point('now play')
-
-	# https://foxutech.com/how-to-configure-dnsmasq/
-	#Local Caching using NetworkManager
-	#Set this in /etc/NetworkManager/NetworkManager.conf:
-	#[main]
-	#dns=dnsmasq
-	#and restart network-manager service.
-
-	#root@linuxdns1:/etc# ls -lRt | grep 15:28
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc0.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc1.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc2.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc3.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc4.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc5.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc6.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 insserv.conf.d
-	#drwxr-xr-x 3 root root    4096 Jun  1 15:28 default
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 init.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 dnsmasq.d
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
-	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
-	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
-	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
-	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
-	#drwxr-xr-x 2 root root 4096 Jun  1 15:28 system.d
-	#drwxr-xr-x 2 root root 4096 Jun  1 15:28 update.d
-	#drwxr-xr-x 2 root root 4096 Jun  1 15:28 multi-user.target.wants
-	#lrwxrwxrwx 1 root root 35 Jun  1 15:28 dnsmasq.service -> /lib/systemd/system/dnsmasq.service
-
-	####################################################################
-	# Install NCSD?
-	####################################################################
-	# The answer is that local processes don't know to connect to /var/run/nscd/socket. Or rather, some do, and some don't. The processes that do know about /var/run/nscd/socket are those linked against glibc and using getaddrinfo from that library.  Only GNU's implementation of the C standard library has the knowledge of /var/run/nscd/socket. If your process is linked against a different libc (e.g. musl), or if your process uses a different runtime (e.g. the Go runtime), it knows nothing of /var/run/nscd/socket. This is your first reason for not using nscd.
-
-	####################################################################
-	# Install landrush
 	####################################################################
