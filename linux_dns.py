@@ -50,7 +50,7 @@ def walkthrough(shutit_session):
 	# PART II
 	#####################################################################
 
-	# This is now for ubuntu
+	# This is now for ubuntu
 	shutit_session.send('echo nameserver 10.10.10.10 >> /etc/resolv.conf', note='Add a nameserver by hand')
 	shutit_session.send('cat /etc/resolv.conf',                            note='Resolv.conf before network restart')
 	shutit_session.send('systemctl restart networking',                    note='Restart networking')
@@ -212,7 +212,7 @@ def walkthrough(shutit_session):
 #This is a good write-up. I think there are a couple of things you could add,
 #because the POSIX DNS API is actually a little more complex than this, even.
 #
-#(First, to pick a nit: What you’re describing has nothing to do with Linux.
+#(First, to pick a nit: What you're describing has nothing to do with Linux.
 #The specification is POSIX, and the implementation is GNU. All of this applies
 #equally to GNU/Windows, aka WSL or "bash on Windows", where there is no Linux
 #component.)
@@ -223,18 +223,18 @@ def walkthrough(shutit_session):
 #an obsolete POSIX specification, and there is getaddrinfo (GETADDRINFO(3))
 #which is the modern POSIX API for name resolution.
 #
-#Applications fall into one of maybe three categories. Maybe two. It’s
+#Applications fall into one of maybe three categories. Maybe two. It's
 #subjective. The first is older applications which still use the obsolete
 #gethostbyname() API. The second is newer applications that use getaddrinfo().
-#Both of those will go through the GNU libc NSS service, so they’ll parse
+#Both of those will go through the GNU libc NSS service, so they'll parse
 #/etc/nsswitch.conf, and from there they might use /etc/hosts, /etc/resolv.conf,
 #/etc/hostname, and they might also use multicast DNS or an NSS caching service
 #like nscd or sssd. The getaddrinfo API will also consult /etc/gai.conf to order
 #address results according to system preference.
 #
 #The third group of applications (or second group, depending on your point of
-#view) is applications that don’t use the POSIX NSS APIs at all. This includes
-#the “host” utility, because “host” is actually one of the applications included
+#view) is applications that don't use the POSIX NSS APIs at all. This includes
+#the "host" utility, because "host" is actually one of the applications included
 #with ISC BIND, and it is intended specifically to interface with DNS directly,
 #and not the system NSS API. It also includes applications like Firefox which
 #bypass NSS and implement their own DNS API for performance reasons. And it
@@ -242,15 +242,15 @@ def walkthrough(shutit_session):
 #records. Such applications will need to use the resolver library or their own
 #DNS client library to access MX or TXT records.
 #
-#I also want to note that “ping localhost” should not fail when nsswitch refers
-#only to DNS. A DNS server is required by RFC to resolve the name “localhost”.
-#The DNS service that you’re using is not compliant with standards, due to a
+#I also want to note that "ping localhost" should not fail when nsswitch refers
+#only to DNS. A DNS server is required by RFC to resolve the name "localhost".
+#The DNS service that you're using is not compliant with standards, due to a
 #configuration error.
 #
 #And, finally, that the documentation for gethostbyname indicates that it will
-#fall back to a DNS server on 127.0.0.1, just like ISC’s “host” application.
+#fall back to a DNS server on 127.0.0.1, just like ISC's "host" application.
 #The documentation for getaddrinfo does not contain such a note, but I suspect
-#that it will do the same since those are both part of GNU libc’s NSS API.
+#that it will do the same since those are both part of GNU libc's NSS API.
 #
 #Thanks for the write-up. I hope this helps.
 
