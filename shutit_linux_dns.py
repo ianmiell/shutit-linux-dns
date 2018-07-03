@@ -57,7 +57,7 @@ end''', echo=False)
 		# Set up the sessions
 		shutit_sessions = {}
 		for machine in sorted(machines.keys()):
-			shutit_sessions.update({machine:shutit.create_session('bash', walkthrough=True)})
+			shutit_sessions.update({machine:shutit.create_session('bash', walkthrough=False)})
 		# Set up and validate landrush
 		for machine in sorted(machines.keys()):
 			shutit_session = shutit_sessions[machine]
