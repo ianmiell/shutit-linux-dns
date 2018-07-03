@@ -12,7 +12,7 @@ rm -f /tmp/a
 #$SHUTIT build --echo -d bash -m shutit-library/vagrant -m shutit-library/virtualization -l debug "$@"
 #../shutit/shutit build --pane -d bash -m shutit-library/vagrant -m shutit-library/virtualization "$@"
 #../shutit/shutit build --pane -l info -d bash -m shutit-library/vagrant -m shutit-library/virtualization "$@"
-../shutit/shutit build -l info -d bash -m shutit-library/vagrant -m shutit-library/virtualization "$@"
+../shutit/shutit build --pane -l info -d bash -m shutit-library/vagrant -m shutit-library/virtualization "$@"
 if [[ $? != 0 ]]
 then
 	exit 1

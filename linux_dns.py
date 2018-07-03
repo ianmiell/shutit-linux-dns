@@ -110,16 +110,93 @@ def walkthrough(shutit_session):
 	#####################################################################
 	# PART III
 	#####################################################################
-
-
-	shutit_session.pause_point('systemd-resolved or NetworkManager')
 	#####################################################################
-	## Install NetworkManager? More about interfaces than anything else
+	## Install NetworkManager.
 	####################################################################
-	#shutit_session.install('network-manager')
-	#shutit_session.send('ls /etc/NetworkManager')
-	#shutit_session.send('cat /etc/NetworkManager/NetworkManager.conf')
+	shutit_session.install('network-manager',                          note='NetworkManager installed, which acts as a hub for all network activity and control.')
+# The following network interfaces were found in /etc/network/interfaces
+# which means they are currently configured by ifupdown:
+# - enp0s8
+# If you want to manage those interfaces with NetworkManager instead
+# remove their configuration from /etc/network/interfaces.
+	shutit_session.send('ls /etc/NetworkManager',                      note='dispatcher.d runs whenever interfaces under its control are updated, conf.d contains your conf files')
+	shutit_session.send('cat /etc/NetworkManager/NetworkManager.conf', note='Note that dns=dnsmasq')
+	####################################################################
+	# Install dnsmasq? See what's changed?
+	####################################################################
+	shutit_session.send('ps -ef | grep dnsmasq',               note='Check whether dnsmasq running - it should not be', check_exit=False)
+	shutit_session.install('dnsmasq', echo=False)
+	shutit_session.send('ps -ef | grep dnsmasq',               note='Check whether dnsmasq running - it should be')
+	shutit_session.send('ls -lRt /etc/dnsmasq.d',              note='Show dnsmasq config files - not much in there')
+	shutit_session.send('systemctl status --no-pager dnsmasq', note='Get status of dnsmasq')
+	shutit_session.send('cat /etc/resolv.conf',                note='resolv.conf now points to 127.0.0.1 - dnsmasq has taken over!')
+	shutit_session.send('cat /var/run/dnsmasq/resolv.conf',    note='Look at dnsmasq run file for resolv.conf')
+	# TODO: set dnsmasq to log queries with log-queries
+	shutit_session.send("sed -i 's/#log-queries/log-queries/g' /etc/dnsmasq.conf")
+	shutit_session.send('systemctl restart dnsmasq')
+	shutit_session.send('ping -c1 bbc.co.uk')
+	shutit_session.send("ps -ef | grep -w dnsmasq | grep -v grep | awk '{print $2}' | xargs -n1 kill -SIGUSR1")
+	shutit_session.send('grep -w dnsmasq /var/log/syslog')
+#root@linuxdns1:~# grep -w dnsmasq /var/log/syslog 
+#Jul  3 15:05:27 ubuntu-xenial systemd[1]: Starting dnsmasq - A lightweight DHCP and caching DNS server...
+#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15517]: dnsmasq: syntax check OK.
+#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: started, version 2.75 cachesize 150
+#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: compile time options: IPv6 GNU-getopt DBus i18n IDN DHCP DHCPv6 no-Lua TFTP conntrack ipset auth DNSSEC loop-detect inotify
+#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: DNS service limited to local subnets
+#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: read /etc/hosts - 8 addresses
+#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: reading /var/run/dnsmasq/resolv.conf
+#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: using nameserver 10.0.2.2#53
+#Jul  3 15:05:27 ubuntu-xenial systemd[1]: Started dnsmasq - A lightweight DHCP and caching DNS server.
+#Jul  3 15:07:47 ubuntu-xenial systemd[1]: Stopping dnsmasq - A lightweight DHCP and caching DNS server...
+#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15533]: no servers found in /var/run/dnsmasq/resolv.conf, will retry
+#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15533]: exiting on receipt of SIGTERM
+#Jul  3 15:07:47 ubuntu-xenial systemd[1]: Stopped dnsmasq - A lightweight DHCP and caching DNS server.
+#Jul  3 15:07:47 ubuntu-xenial systemd[1]: Starting dnsmasq - A lightweight DHCP and caching DNS server...
+#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15684]: dnsmasq: syntax check OK.
+#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: started, version 2.75 cachesize 150
+#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: compile time options: IPv6 GNU-getopt DBus i18n IDN DHCP DHCPv6 no-Lua TFTP conntrack ipset auth DNSSEC loop-detect inotify
+#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: DNS service limited to local subnets
+#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: no servers found in /var/run/dnsmasq/resolv.conf, will retry
+#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: read /etc/hosts - 8 addresses
+#Jul  3 15:07:48 ubuntu-xenial dnsmasq[15697]: reading /var/run/dnsmasq/resolv.conf
+#Jul  3 15:07:48 ubuntu-xenial dnsmasq[15697]: using nameserver 10.0.2.2#53
+#Jul  3 15:07:48 ubuntu-xenial systemd[1]: Started dnsmasq - A lightweight DHCP and caching DNS server.
+#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: query[A] bbc.co.uk from 127.0.0.1
+#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: forwarded bbc.co.uk to 10.0.2.2
+#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply bbc.co.uk is 151.101.64.81
+#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply bbc.co.uk is 151.101.192.81
+#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply bbc.co.uk is 151.101.0.81
+#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply bbc.co.uk is 151.101.128.81
+#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: query[PTR] 81.64.101.151.in-addr.arpa from 127.0.0.1
+#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: forwarded 81.64.101.151.in-addr.arpa to 10.0.2.2
+#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply 151.101.64.81 is NXDOMAIN
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: time 1530630488
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: cache size 150, 0/5 cache insertions re-used unexpired cache entries.
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: queries forwarded 2, queries answered locally 0
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: queries for authoritative zones 0
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: server 10.0.2.2#53: queries sent 2, retried or failed 0
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: Host                                     Address                        Flags      Expires
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: linuxdns1                      172.28.128.8                             4FRI   H
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: ip6-localhost                  ::1                                      6FRI   H
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: ip6-allhosts                   ff02::3                                  6FRI   H
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: ip6-localnet                   fe00::                                   6FRI   H
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: ip6-mcastprefix                ff00::                                   6FRI   H
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: ip6-loopback                   ::1                                      6F I   H
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: ip6-allnodes                   ff02::1                                  6FRI   H
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: bbc.co.uk                      151.101.64.81                            4F         Tue Jul  3 15:11:41 2018
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: bbc.co.uk                      151.101.192.81                           4F         Tue Jul  3 15:11:41 2018
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: bbc.co.uk                      151.101.0.81                             4F         Tue Jul  3 15:11:41 2018
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: bbc.co.uk                      151.101.128.81                           4F         Tue Jul  3 15:11:41 2018
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]:                                151.101.64.81                            4 R  NX    Tue Jul  3 15:34:17 2018
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: localhost                      127.0.0.1                                4FRI   H
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: <Root>                         19036   8   2                            SF I
+#Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: ip6-allrouters                 ff02::2                                  6FRI   H
+	shutit_session.pause_point('now play')
 
+
+	#####################################################################
+	# PART IV
+	#####################################################################
 
 	#####################################################################
 	## Start systemd-resolved - seems different in vagrant?
@@ -129,59 +206,6 @@ def walkthrough(shutit_session):
 	#shutit_session.send('cat /etc/resolv.conf')
 	##https://wiki.ubuntu.com/OverrideDNSServers
 
-
-
-	####################################################################
-	# Install dnsmasq? See what's changed?
-	####################################################################
-	shutit_session.install('dnsmasq', echo=False)
-	shutit_session.send('ps -ef | grep dnsmasq',               note='Check whether dnsmasq running')
-	shutit_session.send('ls -lRt /etc/dnsmasq.d',              note='Show dnsmasq config files - not much in there')
-	shutit_session.send('systemctl status --no-pager dnsmasq', note='Get status of dnsmasq')
-	shutit_session.send('cat /etc/resolv.conf',                note='resolv.conf now points to 127.0.0.1 - dnsmasq has taken over!')
-	shutit_session.send('cat /var/run/dnsmasq/resolv.conf',    note='Look at dnsmasq run file for resolv.conf')
-	# TODO: set dnsmasq to log queries with log-queries
-	shutit_session.pause_point('now play')
-
-	# https://foxutech.com/how-to-configure-dnsmasq/
-	#Local Caching using NetworkManager
-	#Set this in /etc/NetworkManager/NetworkManager.conf:
-	#[main]
-	#dns=dnsmasq
-	#and restart network-manager service.
-
-	#root@linuxdns1:/etc# ls -lRt | grep 15:28
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc0.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc1.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc2.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc3.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc4.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc5.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 rc6.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 insserv.conf.d
-	#drwxr-xr-x 3 root root    4096 Jun  1 15:28 default
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 init.d
-	#drwxr-xr-x 2 root root    4096 Jun  1 15:28 dnsmasq.d
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
-	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
-	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
-	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 S02dnsmasq -> ../init.d/dnsmasq
-	#lrwxrwxrwx 1 root root  14 Jun  1 15:28 S03cron -> ../init.d/cron
-	#lrwxrwxrwx 1 root root  15 Jun  1 15:28 S03rsync -> ../init.d/rsync
-	#lrwxrwxrwx 1 root root  17 Jun  1 15:28 K01dnsmasq -> ../init.d/dnsmasq
-	#drwxr-xr-x 2 root root 4096 Jun  1 15:28 system.d
-	#drwxr-xr-x 2 root root 4096 Jun  1 15:28 update.d
-	#drwxr-xr-x 2 root root 4096 Jun  1 15:28 multi-user.target.wants
-	#lrwxrwxrwx 1 root root 35 Jun  1 15:28 dnsmasq.service -> /lib/systemd/system/dnsmasq.service
-
 	####################################################################
 	# Install NCSD?
 	####################################################################
@@ -190,8 +214,6 @@ def walkthrough(shutit_session):
 	####################################################################
 	# Install landrush
 	####################################################################
-
-
 
 #The next part is the fun one, where you find out some lying piece of shit service
 #is silently replacing resolve.conf with garbage and/or running a local DNS proxy
@@ -253,110 +275,6 @@ def walkthrough(shutit_session):
 #that it will do the same since those are both part of GNU libc's NSS API.
 #
 #Thanks for the write-up. I hope this helps.
-
-
-#	shutit_session.send('/sbin/ifdown -a --read-environment --exclude=enp0s3')
-#Jun 16 17:15:33 linuxdns1 dhclient[1651]: DHCPREQUEST of 172.28.128.3 on enp0s8 to 172.28.128.2 port 67 (xid=0x56b9609)
-#Jun 16 17:15:33 linuxdns1 dhclient[1651]: DHCPACK of 172.28.128.3 from 172.28.128.2
-#Jun 16 17:15:33 linuxdns1 dhclient[1651]: bound to 172.28.128.3 -- renewal in 527 seconds.
-#0s3
-#Killed old client process
-#Jun 16 17:15:36 linuxdns1 dhclient[11446]: Killed old client process
-#Internet Systems Consortium DHCP Client 4.3.3
-#Copyright 2004-2015 Internet Systems Consortium.
-#All rights reserved.
-#For info, please visit https://www.isc.org/software/dhcp/
-#
-#Listening on LPF/enp0s8/08:00:27:e0:5e:37
-#Sending on   LPF/enp0s8/08:00:27:e0:5e:37
-#Sending on   Socket/fallback
-#DHCPRELEASE on enp0s8 to 172.28.128.2 port 67 (xid=0x39c7499a)
-#Jun 16 17:15:37 linuxdns1 dhclient[11446]: Internet Systems Consortium DHCP Client 4.3.3
-#Jun 16 17:15:37 linuxdns1 dhclient[11446]: Copyright 2004-2015 Internet Systems Consortium.
-#Jun 16 17:15:37 linuxdns1 dhclient[11446]: All rights reserved.
-#Jun 16 17:15:37 linuxdns1 dhclient[11446]: For info, please visit https://www.isc.org/software/dhcp/
-#Jun 16 17:15:37 linuxdns1 dhclient[11446]: 
-#Jun 16 17:15:37 linuxdns1 dhclient[11446]: Listening on LPF/enp0s8/08:00:27:e0:5e:37
-#Jun 16 17:15:37 linuxdns1 dhclient[11446]: Sending on   LPF/enp0s8/08:00:27:e0:5e:37
-#Jun 16 17:15:37 linuxdns1 dhclient[11446]: Sending on   Socket/fallback
-#Jun 16 17:15:37 linuxdns1 dhclient[11446]: DHCPRELEASE on enp0s8 to 172.28.128.2 port 67 (xid=0x39c7499a)
-#Jun 16 17:15:37 linuxdns1 dhclient[1651]: receive_packet failed on enp0s8: Network is down
-
-
-
-#root@linuxdns1:/etc# systemctl restart networking
-#Jun 16 17:13:21 linuxdns1 systemd[1]: Stopped Raise network interfaces.
-#Jun 16 17:13:21 linuxdns1 systemd[1]: Starting Raise network interfaces...
-#Jun 16 17:13:21 linuxdns1 dhclient[11259]: Internet Systems Consortium DHCP Client 4.3.3
-#Jun 16 17:13:21 linuxdns1 ifup[11244]: Internet Systems Consortium DHCP Client 4.3.3
-#Jun 16 17:13:21 linuxdns1 ifup[11244]: Copyright 2004-2015 Internet Systems Consortium.
-#Jun 16 17:13:21 linuxdns1 ifup[11244]: All rights reserved.
-#Jun 16 17:13:21 linuxdns1 ifup[11244]: For info, please visit https://www.isc.org/software/dhcp/
-#Jun 16 17:13:21 linuxdns1 dhclient[11259]: Copyright 2004-2015 Internet Systems Consortium.
-#Jun 16 17:13:21 linuxdns1 dhclient[11259]: All rights reserved.
-#Jun 16 17:13:21 linuxdns1 dhclient[11259]: For info, please visit https://www.isc.org/software/dhcp/
-#Jun 16 17:13:21 linuxdns1 dhclient[11259]: 
-#Jun 16 17:13:21 linuxdns1 kernel: IPv6: ADDRCONF(NETDEV_UP): enp0s3: link is not ready
-#Jun 16 17:13:21 linuxdns1 dhclient[11259]: Listening on LPF/enp0s3/02:88:c7:51:8f:1f
-#Jun 16 17:13:21 linuxdns1 ifup[11244]: Listening on LPF/enp0s3/02:88:c7:51:8f:1f
-#Jun 16 17:13:21 linuxdns1 ifup[11244]: Sending on   LPF/enp0s3/02:88:c7:51:8f:1f
-#Jun 16 17:13:21 linuxdns1 ifup[11244]: Sending on   Socket/fallback
-#Jun 16 17:13:21 linuxdns1 ifup[11244]: DHCPDISCOVER on enp0s3 to 255.255.255.255 port 67 interval 3 (xid=0x73485f4d)
-#Jun 16 17:13:21 linuxdns1 dhclient[11259]: Sending on   LPF/enp0s3/02:88:c7:51:8f:1f
-#Jun 16 17:13:21 linuxdns1 dhclient[11259]: Sending on   Socket/fallback
-#Jun 16 17:13:21 linuxdns1 dhclient[11259]: DHCPDISCOVER on enp0s3 to 255.255.255.255 port 67 interval 3 (xid=0x73485f4d)
-#Jun 16 17:13:23 linuxdns1 kernel: e1000: enp0s3 NIC Link is Up 1000 Mbps Full Duplex, Flow Control: RX
-#Jun 16 17:13:23 linuxdns1 kernel: IPv6: ADDRCONF(NETDEV_CHANGE): enp0s3: link becomes ready
-#Jun 16 17:13:24 linuxdns1 dhclient[11259]: DHCPDISCOVER on enp0s3 to 255.255.255.255 port 67 interval 7 (xid=0x73485f4d)
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: DHCPDISCOVER on enp0s3 to 255.255.255.255 port 67 interval 7 (xid=0x73485f4d)
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: DHCPREQUEST of 10.0.2.15 on enp0s3 to 255.255.255.255 port 67 (xid=0x4d5f4873)
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: DHCPOFFER of 10.0.2.15 from 10.0.2.2
-#Jun 16 17:13:24 linuxdns1 dhclient[11259]: DHCPREQUEST of 10.0.2.15 on enp0s3 to 255.255.255.255 port 67 (xid=0x4d5f4873)
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: DHCPACK of 10.0.2.15 from 10.0.2.2
-#Jun 16 17:13:24 linuxdns1 dhclient[11259]: DHCPOFFER of 10.0.2.15 from 10.0.2.2
-#Jun 16 17:13:24 linuxdns1 dhclient[11259]: DHCPACK of 10.0.2.15 from 10.0.2.2
-#Jun 16 17:13:24 linuxdns1 dhclient[11259]: bound to 10.0.2.15 -- renewal in 40734 seconds.
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: bound to 10.0.2.15 -- renewal in 40734 seconds.
-#Jun 16 17:13:24 linuxdns1 systemd[1]: Reloading OpenBSD Secure Shell server.
-#Jun 16 17:13:24 linuxdns1 sshd[1313]: Received SIGHUP; restarting.
-#Jun 16 17:13:24 linuxdns1 systemd[1]: Reloaded OpenBSD Secure Shell server.
-#Jun 16 17:13:24 linuxdns1 sshd[1313]: Server listening on 0.0.0.0 port 22.
-#Jun 16 17:13:24 linuxdns1 sshd[1313]: Server listening on :: port 22.
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: Internet Systems Consortium DHCP Client 4.3.3
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: Internet Systems Consortium DHCP Client 4.3.3
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: Copyright 2004-2015 Internet Systems Consortium.
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: Copyright 2004-2015 Internet Systems Consortium.
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: All rights reserved.
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: All rights reserved.
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: For info, please visit https://www.isc.org/software/dhcp/
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: For info, please visit https://www.isc.org/software/dhcp/
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: 
-#Jun 16 17:13:24 linuxdns1 kernel: IPv6: ADDRCONF(NETDEV_UP): enp0s8: link is not ready
-#Jun 16 17:13:24 linuxdns1 kernel: e1000: enp0s8 NIC Link is Up 1000 Mbps Full Duplex, Flow Control: RX
-#Jun 16 17:13:24 linuxdns1 kernel: IPv6: ADDRCONF(NETDEV_CHANGE): enp0s8: link becomes ready
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: Listening on LPF/enp0s8/08:00:27:e0:5e:37
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: Listening on LPF/enp0s8/08:00:27:e0:5e:37
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: Sending on   LPF/enp0s8/08:00:27:e0:5e:37
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: Sending on   LPF/enp0s8/08:00:27:e0:5e:37
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: Sending on   Socket/fallback
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: Sending on   Socket/fallback
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: DHCPDISCOVER on enp0s8 to 255.255.255.255 port 67 interval 3 (xid=0xb3517800)
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: DHCPDISCOVER on enp0s8 to 255.255.255.255 port 67 interval 3 (xid=0xb3517800)
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: DHCPREQUEST of 172.28.128.3 on enp0s8 to 255.255.255.255 port 67 (xid=0x7851b3)
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: DHCPREQUEST of 172.28.128.3 on enp0s8 to 255.255.255.255 port 67 (xid=0x7851b3)
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: DHCPOFFER of 172.28.128.3 from 172.28.128.2
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: DHCPOFFER of 172.28.128.3 from 172.28.128.2
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: DHCPACK of 172.28.128.3 from 172.28.128.2
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: DHCPACK of 172.28.128.3 from 172.28.128.2
-#Jun 16 17:13:24 linuxdns1 dhclient[11335]: bound to 172.28.128.3 -- renewal in 461 seconds.
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: bound to 172.28.128.3 -- renewal in 461 seconds.
-#Jun 16 17:13:24 linuxdns1 ifup[11244]: RTNETLINK answers: No such process
-#Jun 16 17:13:24 linuxdns1 systemd[1]: Reloading OpenBSD Secure Shell server.
-#Jun 16 17:13:24 linuxdns1 sshd[1313]: Received SIGHUP; restarting.
-#Jun 16 17:13:24 linuxdns1 systemd[1]: Reloaded OpenBSD Secure Shell server.
-#Jun 16 17:13:24 linuxdns1 sshd[1313]: Server listening on 0.0.0.0 port 22.
-#Jun 16 17:13:24 linuxdns1 sshd[1313]: Server listening on :: port 22.
-#Jun 16 17:13:25 linuxdns1 systemd[1]: Started Raise network interfaces.
 
 
 ###############
