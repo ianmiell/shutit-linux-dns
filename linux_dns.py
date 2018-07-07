@@ -121,6 +121,7 @@ def walkthrough(shutit_session):
 # remove their configuration from /etc/network/interfaces.
 	shutit_session.send('ls /etc/NetworkManager',                      note='dispatcher.d runs whenever interfaces under its control are updated, conf.d contains your conf files')
 	shutit_session.send('cat /etc/NetworkManager/NetworkManager.conf', note='Note that dns=dnsmasq')
+	shutit_session.send('systemctl start NetworkManager')
 	####################################################################
 	# Install dnsmasq? See what's changed?
 	####################################################################
@@ -135,41 +136,9 @@ def walkthrough(shutit_session):
 	shutit_session.send("sed -i 's/#log-queries/log-queries/g' /etc/dnsmasq.conf")
 	shutit_session.send('systemctl restart dnsmasq')
 	shutit_session.send('ping -c1 bbc.co.uk')
-	shutit_session.send("ps -ef | grep -w dnsmasq | grep -v grep | awk '{print $2}' | xargs -n1 kill -SIGUSR1")
+	shutit_session.send("kill -SIGUSR1 <(cat /var/log/)")
 	shutit_session.send('grep -w dnsmasq /var/log/syslog')
 #root@linuxdns1:~# grep -w dnsmasq /var/log/syslog 
-#Jul  3 15:05:27 ubuntu-xenial systemd[1]: Starting dnsmasq - A lightweight DHCP and caching DNS server...
-#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15517]: dnsmasq: syntax check OK.
-#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: started, version 2.75 cachesize 150
-#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: compile time options: IPv6 GNU-getopt DBus i18n IDN DHCP DHCPv6 no-Lua TFTP conntrack ipset auth DNSSEC loop-detect inotify
-#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: DNS service limited to local subnets
-#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: read /etc/hosts - 8 addresses
-#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: reading /var/run/dnsmasq/resolv.conf
-#Jul  3 15:05:27 ubuntu-xenial dnsmasq[15533]: using nameserver 10.0.2.2#53
-#Jul  3 15:05:27 ubuntu-xenial systemd[1]: Started dnsmasq - A lightweight DHCP and caching DNS server.
-#Jul  3 15:07:47 ubuntu-xenial systemd[1]: Stopping dnsmasq - A lightweight DHCP and caching DNS server...
-#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15533]: no servers found in /var/run/dnsmasq/resolv.conf, will retry
-#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15533]: exiting on receipt of SIGTERM
-#Jul  3 15:07:47 ubuntu-xenial systemd[1]: Stopped dnsmasq - A lightweight DHCP and caching DNS server.
-#Jul  3 15:07:47 ubuntu-xenial systemd[1]: Starting dnsmasq - A lightweight DHCP and caching DNS server...
-#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15684]: dnsmasq: syntax check OK.
-#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: started, version 2.75 cachesize 150
-#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: compile time options: IPv6 GNU-getopt DBus i18n IDN DHCP DHCPv6 no-Lua TFTP conntrack ipset auth DNSSEC loop-detect inotify
-#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: DNS service limited to local subnets
-#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: no servers found in /var/run/dnsmasq/resolv.conf, will retry
-#Jul  3 15:07:47 ubuntu-xenial dnsmasq[15697]: read /etc/hosts - 8 addresses
-#Jul  3 15:07:48 ubuntu-xenial dnsmasq[15697]: reading /var/run/dnsmasq/resolv.conf
-#Jul  3 15:07:48 ubuntu-xenial dnsmasq[15697]: using nameserver 10.0.2.2#53
-#Jul  3 15:07:48 ubuntu-xenial systemd[1]: Started dnsmasq - A lightweight DHCP and caching DNS server.
-#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: query[A] bbc.co.uk from 127.0.0.1
-#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: forwarded bbc.co.uk to 10.0.2.2
-#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply bbc.co.uk is 151.101.64.81
-#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply bbc.co.uk is 151.101.192.81
-#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply bbc.co.uk is 151.101.0.81
-#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply bbc.co.uk is 151.101.128.81
-#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: query[PTR] 81.64.101.151.in-addr.arpa from 127.0.0.1
-#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: forwarded 81.64.101.151.in-addr.arpa to 10.0.2.2
-#Jul  3 15:07:57 ubuntu-xenial dnsmasq[15697]: reply 151.101.64.81 is NXDOMAIN
 #Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: time 1530630488
 #Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: cache size 150, 0/5 cache insertions re-used unexpired cache entries.
 #Jul  3 15:08:08 ubuntu-xenial dnsmasq[15697]: queries forwarded 2, queries answered locally 0
