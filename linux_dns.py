@@ -167,6 +167,45 @@ def walkthrough(shutit_session):
 	# PART IV
 	#####################################################################
 
+	# If you remove /etc/resolv.conf lookups still work - is this because of libresolv.c, or libnss?
+#1587  open("/etc/host.conf", O_RDONLY|O_CLOEXEC) = 4
+#1587  fstat(4, {st_mode=S_IFREG|0644, st_size=92, ...}) = 0
+#1587  read(4, "# The \"order\" line is only used "..., 4096) = 92
+#1587  read(4, "", 4096)                 = 0
+#1587  close(4)                          = 0
+#1587  open("/etc/hosts", O_RDONLY|O_CLOEXEC) = 4
+#1587  fstat(4, {st_mode=S_IFREG|0644, st_size=284, ...}) = 0
+#1587  read(4, "172.28.128.3\tlinuxdns1\n127.0.0.1"..., 4096) = 284
+#1587  read(4, "", 4096)                 = 0
+#1587  close(4)                          = 0
+#1587  open("/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 4
+#1587  fstat(4, {st_mode=S_IFREG|0644, st_size=35741, ...}) = 0
+#1587  mmap(NULL, 35741, PROT_READ, MAP_PRIVATE, 4, 0) = 0x7fe7c0f2b000
+#1587  close(4)                          = 0
+#1587  access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+#1587  open("/lib/x86_64-linux-gnu/libnss_dns.so.2", O_RDONLY|O_CLOEXEC) = 4
+#1587  read(4, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\220\17\0\0\0\0\0\0"..., 832) = 832
+#1587  fstat(4, {st_mode=S_IFREG|0644, st_size=27000, ...}) = 0
+#1587  mmap(NULL, 2121944, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 4, 0) = 0x7fe7c0326000
+#1587  mprotect(0x7fe7c032b000, 2097152, PROT_NONE) = 0
+#1587  mmap(0x7fe7c052b000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 4, 0x5000) = 0x7fe7c052b000
+#1587  close(4)                          = 0
+#1587  access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+#1587  open("/lib/x86_64-linux-gnu/libresolv.so.2", O_RDONLY|O_CLOEXEC) = 4
+#1587  read(4, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0P9\0\0\0\0\0\0"..., 832) = 832
+#1587  fstat(4, {st_mode=S_IFREG|0644, st_size=101200, ...}) = 0
+#1587  mmap(NULL, 2206280, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 4, 0) = 0x7fe7c010b000
+#1587  mprotect(0x7fe7c0122000, 2097152, PROT_NONE) = 0
+#1587  mmap(0x7fe7c0322000, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 4, 0x17000) = 0x7fe7c0322000
+#1587  mmap(0x7fe7c0324000, 6728, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7fe7c0324000
+#1587  close(4)                          = 0
+#1587  mprotect(0x7fe7c0322000, 4096, PROT_READ) = 0
+#1587  mprotect(0x7fe7c052b000, 4096, PROT_READ) = 0
+#1587  munmap(0x7fe7c0f2b000, 35741)     = 0
+#1587  stat("/etc/resolv.conf", 0x7ffe6bdb8a90) = -1 ENOENT (No such file or directory)
+#1587  socket(PF_INET, SOCK_DGRAM|SOCK_NONBLOCK, IPPROTO_IP) = 4
+#1587  connect(4, {sa_family=AF_INET, sin_port=htons(53), sin_addr=inet_addr("127.0.0.1")}, 16) = 0
+
 	#####################################################################
 	## Start systemd-resolved - seems different in vagrant?
 	####################################################################
@@ -179,6 +218,12 @@ def walkthrough(shutit_session):
 	# Install NCSD?
 	####################################################################
 	# The answer is that local processes don't know to connect to /var/run/nscd/socket. Or rather, some do, and some don't. The processes that do know about /var/run/nscd/socket are those linked against glibc and using getaddrinfo from that library.  Only GNU's implementation of the C standard library has the knowledge of /var/run/nscd/socket. If your process is linked against a different libc (e.g. musl), or if your process uses a different runtime (e.g. the Go runtime), it knows nothing of /var/run/nscd/socket. This is your first reason for not using nscd.
+
+	# rdnssd and resolvconf:
+	# https://www.ctrl.blog/entry/resolvconf-tutorial
+
+	#https://www.ctrl.blog/entry/resolvconf-tutorial
+	# If you’re running Ubuntu 16.10 or later, your DNS resolution will be managed by the systemd-resolved service. You can disable this service without any further ado using the following commands.
 
 	####################################################################
 	# Install landrush
